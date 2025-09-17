@@ -53,3 +53,9 @@ namespace ProgPOE
         }
     }
 }
+//Refernces
+// - ASP.NET Core Documentation: https://docs.microsoft.com/en-us/aspnet/core/?view=aspnetcore-6.0
+// - Entity Framework Core Documentation: https://docs.microsoft.com/en-us/ef/core/
+// - Bootstrap Documentation: https://getbootstrap.com/docs/5.1/getting-started/introduction/
+// - jQuery Documentation: https://api.jquery.com/
+// - ChatGPT https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a
