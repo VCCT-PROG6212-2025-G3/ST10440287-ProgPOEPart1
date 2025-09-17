@@ -1,8 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
-using ProgPOE.Models;
-namespace ProgPOE
+namespace ProgPOE.Models
 {
-    public class ViewModels
+    // Claim submission view model
+    public class DashboardViewModel
     {
         public string UserRole { get; set; }
         public string UserName { get; set; }
