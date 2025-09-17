@@ -1,8 +1,127 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+﻿@* Views/Home/Index.cshtml - Home Page *@
+@{
+    ViewData["Title"] = "Home";
+    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
 <div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+    <h1 class="display-4">📋 Contract Monthly Claim System</h1>
+    <p class="lead">Streamline your monthly claim submissions and approvals</p>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h2 class="text-primary">📝</h2>
+                <h5 class="card-title">Submit Claims</h5>
+                <p class="card-text">
+                    Lecturers can easily submit monthly claims with just a few clicks.
+                    Upload supporting documents and track your submissions in real-time.
+                </p>
+                <a href="@Url.Action("SubmitClaim", "Home")" class="btn btn-primary">
+                    Submit New Claim
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h2 class="text-success">✅</h2>
+                <h5 class="card-title">Easy Approvals</h5>
+                <p class="card-text">
+                    Programme Coordinators and Academic Managers can efficiently
+                    review and approve claims with comprehensive approval tools.
+                </p>
+                <a href="@Url.Action("ApproveClaims", "Home")" class="btn btn-success">
+                    Review Claims
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <h2 class="text-info">📍</h2>
+                <h5 class="card-title">Track Status</h5>
+                <p class="card-text">
+                    Monitor your claims transparently through every step of the
+                    approval process until final settlement and payment.
+                </p>
+                <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info">
+                    Track My Claims
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>🎯 Key Features</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>📋 For Lecturers:</h6>
+                        <ul>
+                            <li><strong>One-click submission</strong> - Submit claims quickly and easily</li>
+                            <li><strong>Document upload</strong> - Attach timesheet, attendance records, and more</li>
+                            <li><strong>Real-time tracking</strong> - Monitor approval progress transparently</li>
+                            <li><strong>Status notifications</strong> - Get updates on claim processing</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>✅ For Coordinators & Managers:</h6>
+                        <ul>
+                            <li><strong>Easy verification</strong> - Review claims with all supporting documents</li>
+                            <li><strong>Bulk processing</strong> - Approve multiple claims efficiently</li>
+                            <li><strong>Approval workflow</strong> - Sequential coordinator → manager approval</li>
+                            <li><strong>Audit trail</strong> - Complete history of all approvals and changes</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12 text-center">
+        <h4>🚀 Get Started</h4>
+        <p class="text-muted">Choose your role to access the appropriate dashboard</p>
+        <div class="btn-group" role="group">
+            <a href="@Url.Action("Dashboard", "Home")" class="btn btn-outline-primary btn-lg">
+                👤 Lecturer Dashboard
+            </a>
+            <a href="@Url.Action("Dashboard", "Home")" class="btn btn-outline-success btn-lg">
+                👥 Coordinator Dashboard
+            </a>
+            <a href="@Url.Action("Dashboard", "Home")" class="btn btn-outline-info btn-lg">
+                🏢 Manager Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-12">
+        <div class="alert alert-info">
+            <h6>📢 System Benefits:</h6>
+            <p class="mb-1">
+                <strong>✅ Consistent Information:</strong> All data is centralized and synchronized across the system
+            </p>
+            <p class="mb-1">
+                <strong>🔒 Reliable Processing:</strong> Secure, auditable workflow ensures accurate claim processing
+            </p>
+            <p class="mb-0">
+                <strong>📊 Transparent Tracking:</strong> Real-time status updates keep everyone informed
+            </p>
+        </div>
+    </div>
 </div>

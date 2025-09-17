@@ -1,0 +1,376 @@
+﻿@* Views/Home/ApproveClaims.cshtml - Approve Claims View *@
+@model List<ProgPOE.Models.Claim>
+@{
+    ViewData["Title"] = "Approve Claims";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>✅ Review Claims - Programme Coordinator</h2>
+        <p class="text-muted">Review and approve claims from lecturers in your department</p>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center bg-warning text-white">
+            <div class="card-body">
+                <h5>⏳ Pending Review</h5>
+                <h2>8</h2>
+                <small>Awaiting your approval</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h5>✅ Approved Today</h5>
+                <h2>5</h2>
+                <small>Successfully processed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-info text-white">
+            <div class="card-body">
+                <h5>👥 Department Lecturers</h5>
+                <h2>24</h2>
+                <small>Active in system</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center bg-primary text-white">
+            <div class="card-body">
+                <h5>💰 Total Amount</h5>
+                <h2>R 850K</h2>
+                <small>Pending approval</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filters and Actions -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label class="form-label">Department:</label>
+                <select class="form-control">
+                    <option>Computer Science</option>
+                    <option>Mathematics</option>
+                    <option>Engineering</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Priority:</label>
+                <select class="form-control">
+                    <option>All Claims</option>
+                    <option>Urgent (>7 days)</option>
+                    <option>High Amount (>R50k)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Submitted Since:</label>
+                <input type="date" class="form-control" value="2024-04-01" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Bulk Actions:</label>
+                <div class="btn-group w-100">
+                    <button class="btn btn-success" onclick="bulkApprove()">✅ Approve All</button>
+                    <button class="btn btn-danger" onclick="bulkReject()">❌ Reject All</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Claims for Approval -->
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>📋 Claims Awaiting Approval</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th><input type="checkbox" onclick="toggleAllCheckboxes(this)" /></th>
+                                <th>Lecturer</th>
+                                <th>Period</th>
+                                <th>Hours</th>
+                                <th>Amount</th>
+                                <th>Submitted</th>
+                                <th>Days</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="claim-row" data-claim-id="1">
+                                <td><input type="checkbox" class="claim-checkbox" /></td>
+                                <td>
+                                    <strong>Dr. Sarah Johnson</strong><br>
+                                    <small class="text-muted">Computer Science</small>
+                                </td>
+                                <td>Apr 2024</td>
+                                <td class="text-end">128.0</td>
+                                <td class="text-end"><strong>R 57,600</strong></td>
+                                <td>2024-04-02</td>
+                                <td>
+                                    <span class="badge bg-success">3 days</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(1)">
+                                        🔍 Review
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <tr class="claim-row" data-claim-id="2">
+                                <td><input type="checkbox" class="claim-checkbox" /></td>
+                                <td>
+                                    <strong>Prof. Mike Wilson</strong><br>
+                                    <small class="text-muted">Computer Science</small>
+                                </td>
+                                <td>Apr 2024</td>
+                                <td class="text-end">145.5</td>
+                                <td class="text-end"><strong>R 65,475</strong></td>
+                                <td>2024-04-01</td>
+                                <td>
+                                    <span class="badge bg-warning">4 days</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(2)">
+                                        🔍 Review
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <tr class="claim-row" data-claim-id="3">
+                                <td><input type="checkbox" class="claim-checkbox" /></td>
+                                <td>
+                                    <strong>Dr. Jane Smith</strong><br>
+                                    <small class="text-muted">Computer Science</small>
+                                </td>
+                                <td>Mar 2024</td>
+                                <td class="text-end">156.0</td>
+                                <td class="text-end"><strong>R 70,200</strong></td>
+                                <td>2024-03-28</td>
+                                <td>
+                                    <span class="badge bg-danger">8 days</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(3)">
+                                        🔍 Review
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Review Panel -->
+    <div class="col-md-4">
+        <div class="card" id="reviewPanel" style="display: none;">
+            <div class="card-header">
+                <h5>📝 Review Claim</h5>
+            </div>
+            <div class="card-body">
+                <div id="claimDetails">
+                    <!-- Claim details will be populated here -->
+                </div>
+
+                <hr>
+
+                <div class="mb-3">
+                    <label class="form-label">Review Comments:</label>
+                    <textarea id="reviewComments" class="form-control" rows="3"
+                              placeholder="Add your review comments..."></textarea>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success" onclick="approveClaim()">
+                        ✅ Approve Claim
+                    </button>
+                    <button class="btn btn-danger" onclick="rejectClaim()">
+                        ❌ Reject Claim
+                    </button>
+                    <button class="btn btn-warning" onclick="returnClaim()">
+                        ↩️ Return for Revision
+                    </button>
+                    <button class="btn btn-info" onclick="viewDocuments()">
+                        📎 View Documents
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Guidelines Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6>📋 Approval Guidelines</h6>
+            </div>
+            <div class="card-body">
+                <h6>✅ Approve if:</h6>
+                <ul class="small">
+                    <li>Hours are reasonable and documented</li>
+                    <li>Supporting documents are complete</li>
+                    <li>Hourly rate matches contract</li>
+                    <li>No discrepancies in information</li>
+                </ul>
+
+                <h6>❌ Reject if:</h6>
+                <ul class="small">
+                    <li>Missing required documentation</li>
+                    <li>Hours exceed reasonable limits</li>
+                    <li>Inconsistent information</li>
+                    <li>Duplicate submissions</li>
+                </ul>
+
+                <h6>↩️ Return if:</h6>
+                <ul class="small">
+                    <li>Minor corrections needed</li>
+                    <li>Additional documents required</li>
+                    <li>Clarification needed</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentClaimId = null;
+
+    function reviewClaim(claimId) {
+        currentClaimId = claimId;
+        const claimData = {
+            1: {
+                lecturer: 'Dr. Sarah Johnson',
+                department: 'Computer Science',
+                period: 'April 2024',
+                hours: '128.0',
+                rate: 'R 450.00',
+                total: 'R 57,600.00',
+                submitted: '2024-04-02',
+                documents: ['📄 timesheet.pdf', '📊 attendance.xlsx', '📋 schedule.docx']
+            },
+            2: {
+                lecturer: 'Prof. Mike Wilson',
+                department: 'Computer Science',
+                period: 'April 2024',
+                hours: '145.5',
+                rate: 'R 450.00',
+                total: 'R 65,475.00',
+                submitted: '2024-04-01',
+                documents: ['📄 timesheet.pdf', '🖼️ class_photo.jpg']
+            },
+            3: {
+                lecturer: 'Dr. Jane Smith',
+                department: 'Computer Science',
+                period: 'March 2024',
+                hours: '156.0',
+                rate: 'R 450.00',
+                total: 'R 70,200.00',
+                submitted: '2024-03-28',
+                documents: ['📄 timesheet.pdf', '📊 attendance.xlsx', '📋 schedule.docx', '📧 email.pdf']
+            }
+        };
+
+        const claim = claimData[claimId];
+        const detailsHtml = `
+            <h6><strong>${claim.lecturer}</strong></h6>
+            <p class="mb-1"><strong>Department:</strong> ${claim.department}</p>
+            <p class="mb-1"><strong>Period:</strong> ${claim.period}</p>
+            <p class="mb-1"><strong>Hours:</strong> ${claim.hours}</p>
+            <p class="mb-1"><strong>Rate:</strong> ${claim.rate}</p>
+            <p class="mb-1"><strong>Total:</strong> <span class="text-success">${claim.total}</span></p>
+            <p class="mb-1"><strong>Submitted:</strong> ${claim.submitted}</p>
+            <p class="mb-2"><strong>Documents:</strong></p>
+            <ul class="small">
+                ${claim.documents.map(doc => `<li>${doc}</li>`).join('')}
+            </ul>
+        `;
+
+        document.getElementById('claimDetails').innerHTML = detailsHtml;
+        document.getElementById('reviewPanel').style.display = 'block';
+
+        // Highlight selected row
+        document.querySelectorAll('.claim-row').forEach(row => row.classList.remove('table-active'));
+        document.querySelector(`[data-claim-id="${claimId}"]`).classList.add('table-active');
+    }
+
+    function approveClaim() {
+        const comments = document.getElementById('reviewComments').value;
+        alert(`✅ Claim Approved!\n\nClaim ID: CL-2024-00${currentClaimId}\nComments: ${comments || 'No additional comments'}\n\nThe claim has been forwarded to the Academic Manager for final approval.\n\n⚠️ Visual Prototype Only`);
+
+        // Remove row from table (simulate processing)
+        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
+        document.getElementById('reviewPanel').style.display = 'none';
+    }
+
+    function rejectClaim() {
+        const comments = document.getElementById('reviewComments').value;
+        if (!comments.trim()) {
+            alert('Please provide rejection comments before rejecting the claim.');
+            return;
+        }
+
+        alert(`❌ Claim Rejected!\n\nClaim ID: CL-2024-00${currentClaimId}\nReason: ${comments}\n\nThe lecturer will be notified via email with your feedback.\n\n⚠️ Visual Prototype Only`);
+
+        // Remove row from table (simulate processing)
+        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
+        document.getElementById('reviewPanel').style.display = 'none';
+    }
+
+    function returnClaim() {
+        const comments = document.getElementById('reviewComments').value;
+        if (!comments.trim()) {
+            alert('Please provide comments explaining what needs to be corrected.');
+            return;
+        }
+
+        alert(`↩️ Claim Returned for Revision!\n\nClaim ID: CL-2024-00${currentClaimId}\nInstructions: ${comments}\n\nThe lecturer can make corrections and resubmit.\n\n⚠️ Visual Prototype Only`);
+
+        // Remove row from table (simulate processing)
+        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
+        document.getElementById('reviewPanel').style.display = 'none';
+    }
+
+    function viewDocuments() {
+        alert(`📎 Document Viewer\n\nThis would open a document viewer showing:\n• All uploaded supporting documents\n• Document preview functionality\n• Download options\n• Document verification tools\n\n⚠️ Visual Prototype Only`);
+    }
+
+    function toggleAllCheckboxes(masterCheckbox) {
+        const checkboxes = document.querySelectorAll('.claim-checkbox');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = masterCheckbox.checked;
+        });
+    }
+
+    function bulkApprove() {
+        const checkedBoxes = document.querySelectorAll('.claim-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Please select at least one claim to approve.');
+            return;
+        }
+
+        alert(`✅ Bulk Approval\n\n${checkedBoxes.length} claim(s) will be approved and forwarded to the Academic Manager.\n\n⚠️ Visual Prototype Only`);
+    }
+
+    function bulkReject() {
+        const checkedBoxes = document.querySelectorAll('.claim-checkbox:checked');
+        if (checkedBoxes.length === 0) {
+            alert('Please select at least one claim to reject.');
+            return;
+        }
+
+        alert(`❌ Bulk Rejection\n\n${checkedBoxes.length} claim(s) will be rejected. Please ensure you have provided individual feedback for each claim.\n\n⚠️ Visual Prototype Only`);
+    }
+</script>

@@ -1,0 +1,133 @@
+﻿@* Views/Home/Dashboard.cshtml - Dashboard View *@
+@model CMCS.ViewModels.DashboardViewModel
+@{
+    ViewData["Title"] = "Dashboard";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h2>📊 @Model.UserRole Dashboard</h2>
+        <p class="text-muted">Welcome back, @Model.UserName! Here's an overview of your claims activity.</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row">
+    <div class="col-md-3">
+        <div class="card card-stat card-total">
+            <div class="card-body">
+                <h5 class="card-title">📊 Total Claims</h5>
+                <h3 class="card-text text-primary">@Model.TotalClaims</h3>
+                <small class="text-muted">All time</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-stat card-pending">
+            <div class="card-body">
+                <h5 class="card-title">⏳ Pending</h5>
+                <h3 class="card-text text-warning">@Model.PendingClaims</h3>
+                <small class="text-muted">Awaiting approval</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-stat card-approved">
+            <div class="card-body">
+                <h5 class="card-title">✅ Approved</h5>
+                <h3 class="card-text text-success">@Model.ApprovedClaims</h3>
+                <small class="text-muted">Successfully processed</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card card-stat card-rejected">
+            <div class="card-body">
+                <h5 class="card-title">💰 Total Earnings</h5>
+                <h3 class="card-text text-success">@Model.FormattedEarnings</h3>
+                <small class="text-muted">Approved claims</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>🚀 Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <a href="@Url.Action("SubmitClaim", "Home")" class="btn btn-primary btn-lg w-100 mb-2">
+                            📝 Submit New Claim
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info btn-lg w-100 mb-2">
+                            📋 View My Claims
+                        </a>
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-success btn-lg w-100 mb-2" onclick="uploadDocuments()">
+                            📎 Upload Documents
+                        </button>
+                    </div>
+                    <div class="col-md-3">
+                        <a href="@Url.Action("ApproveClaims", "Home")" class="btn btn-warning btn-lg w-100 mb-2">
+                            ✅ Review Claims
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>📈 Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">📤 Claim submitted for April 2024</h6>
+                            <small>3 days ago</small>
+                        </div>
+                        <p class="mb-1">125.5 hours at R450/hour = R56,475.00</p>
+                        <small class="text-warning">Status: Pending Coordinator Review</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">✅ Claim approved for March 2024</h6>
+                            <small>1 week ago</small>
+                        </div>
+                        <p class="mb-1">118 hours at R450/hour = R53,100.00</p>
+                        <small class="text-success">Status: Approved - Payment processed</small>
+                    </div>
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">📎 Documents uploaded for February 2024</h6>
+                            <small>2 weeks ago</small>
+                        </div>
+                        <p class="mb-1">Added timesheet.pdf and attendance_record.xlsx</p>
+                        <small class="text-info">Documents processed successfully</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function uploadDocuments() {
+        alert('📎 Document Upload Feature\n\nThis would open a file upload dialog where lecturers can:\n• Upload PDF, DOC, DOCX, JPG, PNG files\n• Add multiple documents per claim\n• Track upload progress\n• View uploaded documents\n\n⚠️ Visual Prototype Only - No actual upload occurs.');
+    }
+</script>
