@@ -33,6 +33,16 @@ namespace ProgPOE.Models
 
         // Computed property for display
         public string FullName => $"{FirstName} {LastName}";
+
+        // Constructor for easy object creation
+        public User() { }
+
+        public User(string firstName, string lastName, string department = null)
+        {
+            FirstName = firstName;
+            LastName = lastName;
+            Department = department;
+        }
     }
 
     public enum UserRole
