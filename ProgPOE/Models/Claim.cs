@@ -28,7 +28,6 @@ namespace ProgPOE.Models
         public DateTime SubmissionDate { get; set; }
 
         public DateTime? CoordinatorApprovalDate { get; set; }
-
         public DateTime? ManagerApprovalDate { get; set; }
 
         public string LecturerNotes { get; set; }
