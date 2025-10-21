@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProgPOE.Models
 {
@@ -8,41 +9,35 @@ namespace ProgPOE.Models
 
         [Required]
         [StringLength(50)]
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
         [Required]
         [EmailAddress]
-        public string Email { get; set; }
+        [StringLength(100)]
+        public string Email { get; set; } = string.Empty;
 
         [Required]
-        public string FirstName { get; set; }
+        [StringLength(50)]
+        public string FirstName { get; set; } = string.Empty;
 
         [Required]
-        public string LastName { get; set; }
+        [StringLength(50)]
+        public string LastName { get; set; } = string.Empty;
 
         [Required]
         public UserRole Role { get; set; }
 
-        public string Department { get; set; }
+        [StringLength(100)]
+        public string? Department { get; set; }
 
         public decimal? DefaultHourlyRate { get; set; }
 
-        public DateTime CreatedDate { get; set; }
+        public DateTime CreatedDate { get; set; } = DateTime.Now;
 
         public bool IsActive { get; set; } = true;
 
-        // Computed property for display
+        [NotMapped]
         public string FullName => $"{FirstName} {LastName}";
-
-        // Constructor for easy object creation
-        public User() { }
-
-        public User(string firstName, string lastName, string department = null)
-        {
-            FirstName = firstName;
-            LastName = lastName;
-            Department = department;
-        }
     }
 
     public enum UserRole

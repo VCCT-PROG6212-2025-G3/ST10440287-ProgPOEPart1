@@ -1,376 +1,671 @@
-﻿@* Views/Home/ApproveClaims.cshtml - Approve Claims View *@
-@model List<ProgPOE.Models.Claim>
+﻿@model List<ProgPOE.Models.Claim>
 @{
     ViewData["Title"] = "Approve Claims";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="row">
-    <div class="col-md-12">
-        <h2>✅ Review Claims - Programme Coordinator</h2>
-        <p class="text-muted">Review and approve claims from lecturers in your department</p>
+<style>
+    .approval-container {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 30px;
+        border-radius: 15px;
+        margin-bottom: 30px;
+        color: white;
+    }
+
+    .claim-review-card {
+        border-left: 5px solid #ffc107;
+        margin-bottom: 20px;
+        transition: all 0.3s ease;
+    }
+
+        .claim-review-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .claim-review-card.selected {
+            border-left-color: #007bff;
+            background-color: #f8f9fa;
+        }
+
+    .stat-card {
+        border-radius: 12px;
+        padding: 20px;
+        color: white;
+        margin-bottom: 20px;
+    }
+
+    .review-panel {
+        position: sticky;
+        top: 20px;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+    }
+
+    .action-btn {
+        padding: 12px 30px;
+        font-size: 1.1rem;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+    .claim-detail-row {
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+    }
+
+        .claim-detail-row:last-child {
+            border-bottom: none;
+        }
+
+    .badge-large {
+        font-size: 1rem;
+        padding: 8px 15px;
+    }
+
+    .urgency-high {
+        animation: pulse 2s infinite;
+    }
+
+    @@keyframes pulse {
+        0%, 100%{
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+    }
+
+    .document-list {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+
+    .guideline-box {
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 15px;
+    }
+</style>
+
+<div class="approval-container">
+    <div class="text-center">
+        <h1 class="display-4">✅ Review & Approve Claims</h1>
+        <p class="lead">@ViewBag.UserRole Dashboard</p>
+        <p>Welcome, @ViewBag.UserName</p>
     </div>
 </div>
 
-<!-- Summary Cards -->
+<!-- Summary Statistics -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card text-center bg-warning text-white">
-            <div class="card-body">
-                <h5>⏳ Pending Review</h5>
-                <h2>8</h2>
-                <small>Awaiting your approval</small>
-            </div>
+        <div class="stat-card bg-warning text-center">
+            <h2>@Model.Count</h2>
+            <p class="mb-0">⏳ Pending Review</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center bg-success text-white">
-            <div class="card-body">
-                <h5>✅ Approved Today</h5>
-                <h2>5</h2>
-                <small>Successfully processed</small>
-            </div>
+        <div class="stat-card bg-danger text-center">
+            <h2>@Model.Count(c => (DateTime.Now - c.SubmissionDate).Days > 7)</h2>
+            <p class="mb-0">🚨 Urgent (>7 days)</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center bg-info text-white">
-            <div class="card-body">
-                <h5>👥 Department Lecturers</h5>
-                <h2>24</h2>
-                <small>Active in system</small>
-            </div>
+        <div class="stat-card bg-info text-center">
+            <h2>@Model.Count(c => c.TotalAmount > 50000)</h2>
+            <p class="mb-0">💰 High Value (>R50k)</p>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-center bg-primary text-white">
-            <div class="card-body">
-                <h5>💰 Total Amount</h5>
-                <h2>R 850K</h2>
-                <small>Pending approval</small>
-            </div>
+        <div class="stat-card bg-success text-center">
+            <h2>R @Model.Sum(c => c.TotalAmount).ToString("N2")</h2>
+            <p class="mb-0">💵 Total Amount</p>
         </div>
     </div>
 </div>
 
-<!-- Filters and Actions -->
+<!-- Filter Bar -->
 <div class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0">🔍 Filter & Sort Claims</h5>
+    </div>
     <div class="card-body">
         <div class="row">
             <div class="col-md-3">
-                <label class="form-label">Department:</label>
-                <select class="form-control">
-                    <option>Computer Science</option>
-                    <option>Mathematics</option>
-                    <option>Engineering</option>
+                <label class="form-label fw-bold">Filter by Priority:</label>
+                <select class="form-control" id="priorityFilter" onchange="filterClaims()">
+                    <option value="all">All Claims</option>
+                    <option value="urgent">Urgent (>7 days)</option>
+                    <option value="high-value">High Value (>R50k)</option>
+                    <option value="recent">Recent (Last 3 days)</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Priority:</label>
-                <select class="form-control">
-                    <option>All Claims</option>
-                    <option>Urgent (>7 days)</option>
-                    <option>High Amount (>R50k)</option>
+                <label class="form-label fw-bold">Sort by:</label>
+                <select class="form-control" id="sortOrder" onchange="sortClaims()">
+                    <option value="date-asc">Date (Oldest First)</option>
+                    <option value="date-desc">Date (Newest First)</option>
+                    <option value="amount-desc">Amount (High to Low)</option>
+                    <option value="amount-asc">Amount (Low to High)</option>
                 </select>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Submitted Since:</label>
-                <input type="date" class="form-control" value="2024-04-01" />
+                <label class="form-label fw-bold">Search Lecturer:</label>
+                <input type="text" class="form-control" id="searchInput" placeholder="Search by name..." onkeyup="searchClaims()">
             </div>
             <div class="col-md-3">
-                <label class="form-label">Bulk Actions:</label>
+                <label class="form-label fw-bold">Bulk Actions:</label>
                 <div class="btn-group w-100">
-                    <button class="btn btn-success" onclick="bulkApprove()">✅ Approve All</button>
-                    <button class="btn btn-danger" onclick="bulkReject()">❌ Reject All</button>
+                    <button class="btn btn-outline-primary" onclick="selectAll()">
+                        ☑️ Select All
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="clearSelection()">
+                        ❌ Clear
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Claims for Approval -->
 <div class="row">
-    <div class="col-md-8">
+    <!-- Claims List Column -->
+    <div class="col-lg-8">
         <div class="card">
-            <div class="card-header">
-                <h5>📋 Claims Awaiting Approval</h5>
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">📋 Claims Awaiting Your Approval</h5>
             </div>
             <div class="card-body">
-                <div class="table-responsive">
-                    <table class="table table-hover">
-                        <thead class="table-dark">
-                            <tr>
-                                <th><input type="checkbox" onclick="toggleAllCheckboxes(this)" /></th>
-                                <th>Lecturer</th>
-                                <th>Period</th>
-                                <th>Hours</th>
-                                <th>Amount</th>
-                                <th>Submitted</th>
-                                <th>Days</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr class="claim-row" data-claim-id="1">
-                                <td><input type="checkbox" class="claim-checkbox" /></td>
-                                <td>
-                                    <strong>Dr. Sarah Johnson</strong><br>
-                                    <small class="text-muted">Computer Science</small>
-                                </td>
-                                <td>Apr 2024</td>
-                                <td class="text-end">128.0</td>
-                                <td class="text-end"><strong>R 57,600</strong></td>
-                                <td>2024-04-02</td>
-                                <td>
-                                    <span class="badge bg-success">3 days</span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(1)">
-                                        🔍 Review
-                                    </button>
-                                </td>
-                            </tr>
+                @if (Model.Count == 0)
+                {
+                    <div class="text-center py-5">
+                        <h3>✅ All Clear!</h3>
+                        <p class="text-muted">No pending claims at the moment.</p>
+                    </div>
+                }
+                else
+                {
+                    <div id="claimsList">
+                        @foreach (var claim in Model.OrderBy(c => c.SubmissionDate))
+                        {
+                            var daysWaiting = (DateTime.Now - claim.SubmissionDate).Days;
+                            var isUrgent = daysWaiting > 7;
+                            var isHighValue = claim.TotalAmount > 50000;
 
-                            <tr class="claim-row" data-claim-id="2">
-                                <td><input type="checkbox" class="claim-checkbox" /></td>
-                                <td>
-                                    <strong>Prof. Mike Wilson</strong><br>
-                                    <small class="text-muted">Computer Science</small>
-                                </td>
-                                <td>Apr 2024</td>
-                                <td class="text-end">145.5</td>
-                                <td class="text-end"><strong>R 65,475</strong></td>
-                                <td>2024-04-01</td>
-                                <td>
-                                    <span class="badge bg-warning">4 days</span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(2)">
-                                        🔍 Review
-                                    </button>
-                                </td>
-                            </tr>
+                            <div class="card claim-review-card"
+                                 data-claim-id="@claim.ClaimId"
+                                 data-amount="@claim.TotalAmount"
+                                 data-date="@claim.SubmissionDate.Ticks"
+                                 data-lecturer="@claim.Lecturer?.FullName"
+                                 data-days="@daysWaiting">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-1">
+                                            <input type="checkbox" class="form-check-input claim-checkbox"
+                                                   data-claim-id="@claim.ClaimId" style="width: 25px; height: 25px;">
+                                        </div>
+                                        <div class="col-md-11">
+                                            <div class="d-flex justify-content-between align-items-start mb-3">
+                                                <div>
+                                                    <h5 class="mb-1">
+                                                        <strong>@claim.Lecturer?.FullName</strong>
+                                                        @if (isUrgent)
+                                                        {
+                                                            <span class="badge bg-danger urgency-high ms-2">🚨 Urgent</span>
+                                                        }
+                                                        @if (isHighValue)
+                                                        {
+                                                            <span class="badge bg-warning text-dark ms-2">💰 High Value</span>
+                                                        }
+                                                    </h5>
+                                                    <p class="text-muted mb-0">
+                                                        <small>
+                                                            @claim.Lecturer?.Department |
+                                                            @claim.Lecturer?.Email
+                                                        </small>
+                                                    </p>
+                                                </div>
+                                                <span class="badge badge-large bg-primary">
+                                                    CL-@claim.ClaimId.ToString("D6")
+                                                </span>
+                                            </div>
 
-                            <tr class="claim-row" data-claim-id="3">
-                                <td><input type="checkbox" class="claim-checkbox" /></td>
-                                <td>
-                                    <strong>Dr. Jane Smith</strong><br>
-                                    <small class="text-muted">Computer Science</small>
-                                </td>
-                                <td>Mar 2024</td>
-                                <td class="text-end">156.0</td>
-                                <td class="text-end"><strong>R 70,200</strong></td>
-                                <td>2024-03-28</td>
-                                <td>
-                                    <span class="badge bg-danger">8 days</span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary" onclick="reviewClaim(3)">
-                                        🔍 Review
-                                    </button>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+                                            <div class="row mb-2">
+                                                <div class="col-md-6">
+                                                    <div class="claim-detail-row">
+                                                        <strong>📅 Period:</strong> @claim.MonthYear
+                                                    </div>
+                                                    <div class="claim-detail-row">
+                                                        <strong>⏰ Hours Worked:</strong> @claim.HoursWorked hours
+                                                    </div>
+                                                    <div class="claim-detail-row">
+                                                        <strong>💵 Hourly Rate:</strong> R @claim.HourlyRate.ToString("N2")
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="claim-detail-row">
+                                                        <strong>📤 Submitted:</strong> @claim.SubmissionDate.ToString("dd MMM yyyy")
+                                                    </div>
+                                                    <div class="claim-detail-row">
+                                                        <strong>⏱️ Waiting:</strong> @daysWaiting day(s)
+                                                    </div>
+                                                    <div class="claim-detail-row">
+                                                        <strong>📎 Documents:</strong>
+                                                        @if (claim.Documents.Any())
+                                                        {
+                                                            <span class="badge bg-info">@claim.Documents.Count file(s)</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-warning">No documents</span>
+                                                        }
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="alert alert-success mb-2">
+                                                <strong>💰 Total Claim Amount: R @claim.TotalAmount.ToString("N2")</strong>
+                                            </div>
+
+                                            @if (!string.IsNullOrEmpty(claim.LecturerNotes))
+                                            {
+                                                <div class="alert alert-info mb-2">
+                                                    <strong>📝 Lecturer Notes:</strong><br>
+                                                    @claim.LecturerNotes
+                                                </div>
+                                            }
+
+                                            <div class="mt-3">
+                                                <button class="btn btn-primary btn-sm me-2"
+                                                        onclick="reviewClaim(@claim.ClaimId, '@claim.Lecturer?.FullName', '@claim.MonthYear', @claim.HoursWorked, @claim.HourlyRate, @claim.TotalAmount, '@claim.LecturerNotes', @claim.Documents.Count, '@claim.SubmissionDate.ToString("dd MMM yyyy")', @daysWaiting)">
+                                                    🔍 Review Claim
+                                                </button>
+                                                <button class="btn btn-success btn-sm me-2"
+                                                        onclick="quickApprove(@claim.ClaimId, '@claim.Lecturer?.FullName')">
+                                                    ✅ Quick Approve
+                                                </button>
+                                                <button class="btn btn-danger btn-sm"
+                                                        onclick="quickReject(@claim.ClaimId, '@claim.Lecturer?.FullName')">
+                                                    ❌ Quick Reject
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
             </div>
         </div>
+
+        <!-- Bulk Actions -->
+        @if (Model.Count > 0)
+        {
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h5>⚡ Bulk Actions</h5>
+                    <p class="text-muted">Select multiple claims using checkboxes above</p>
+                    <button class="btn btn-success me-2" onclick="bulkApprove()">
+                        ✅ Approve Selected
+                    </button>
+                    <button class="btn btn-danger" onclick="bulkReject()">
+                        ❌ Reject Selected
+                    </button>
+                    <span class="ms-3" id="selectedCount">0 claims selected</span>
+                </div>
+            </div>
+        }
     </div>
 
-    <!-- Review Panel -->
-    <div class="col-md-4">
-        <div class="card" id="reviewPanel" style="display: none;">
-            <div class="card-header">
-                <h5>📝 Review Claim</h5>
+    <!-- Review Panel Column -->
+    <div class="col-lg-4">
+        <div class="card review-panel" id="reviewPanel" style="display: none;">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">📝 Claim Review</h5>
             </div>
             <div class="card-body">
-                <div id="claimDetails">
-                    <!-- Claim details will be populated here -->
-                </div>
+                <div id="claimDetails"></div>
 
                 <hr>
 
-                <div class="mb-3">
-                    <label class="form-label">Review Comments:</label>
-                    <textarea id="reviewComments" class="form-control" rows="3"
-                              placeholder="Add your review comments..."></textarea>
-                </div>
+                <h6 class="fw-bold">💬 Review Comments:</h6>
+                <textarea id="reviewComments" class="form-control mb-3" rows="4"
+                          placeholder="Enter your comments here (required for rejection)..."></textarea>
 
                 <div class="d-grid gap-2">
-                    <button class="btn btn-success" onclick="approveClaim()">
+                    <button class="btn btn-success action-btn" onclick="approveClaim()">
                         ✅ Approve Claim
                     </button>
-                    <button class="btn btn-danger" onclick="rejectClaim()">
+                    <button class="btn btn-danger action-btn" onclick="rejectClaim()">
                         ❌ Reject Claim
                     </button>
-                    <button class="btn btn-warning" onclick="returnClaim()">
+                    <button class="btn btn-warning action-btn" onclick="returnClaim()">
                         ↩️ Return for Revision
                     </button>
-                    <button class="btn btn-info" onclick="viewDocuments()">
-                        📎 View Documents
+                    <button class="btn btn-secondary" onclick="closeReview()">
+                        ❌ Close
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Guidelines Card -->
+        <!-- Approval Guidelines -->
         <div class="card mt-3">
-            <div class="card-header">
-                <h6>📋 Approval Guidelines</h6>
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">📋 Approval Guidelines</h6>
             </div>
             <div class="card-body">
-                <h6>✅ Approve if:</h6>
-                <ul class="small">
-                    <li>Hours are reasonable and documented</li>
-                    <li>Supporting documents are complete</li>
-                    <li>Hourly rate matches contract</li>
-                    <li>No discrepancies in information</li>
-                </ul>
+                <div class="guideline-box">
+                    <h6 class="text-success">✅ Approve if:</h6>
+                    <ul class="small mb-0">
+                        <li>Hours are reasonable and documented</li>
+                        <li>Supporting documents are complete</li>
+                        <li>Hourly rate matches contract</li>
+                        <li>No discrepancies in information</li>
+                        <li>All required fields are filled</li>
+                    </ul>
+                </div>
 
-                <h6>❌ Reject if:</h6>
-                <ul class="small">
-                    <li>Missing required documentation</li>
-                    <li>Hours exceed reasonable limits</li>
-                    <li>Inconsistent information</li>
-                    <li>Duplicate submissions</li>
-                </ul>
+                <div class="guideline-box">
+                    <h6 class="text-danger">❌ Reject if:</h6>
+                    <ul class="small mb-0">
+                        <li>Missing required documentation</li>
+                        <li>Hours exceed reasonable limits</li>
+                        <li>Inconsistent information</li>
+                        <li>Duplicate submissions</li>
+                        <li>Incorrect rate applied</li>
+                    </ul>
+                </div>
 
-                <h6>↩️ Return if:</h6>
-                <ul class="small">
-                    <li>Minor corrections needed</li>
-                    <li>Additional documents required</li>
-                    <li>Clarification needed</li>
-                </ul>
+                <div class="guideline-box">
+                    <h6 class="text-warning">↩️ Return if:</h6>
+                    <ul class="small mb-0">
+                        <li>Minor corrections needed</li>
+                        <li>Additional documents required</li>
+                        <li>Clarification needed</li>
+                        <li>Small errors that can be fixed</li>
+                    </ul>
+                </div>
+
+                <div class="alert alert-info mb-0 mt-3">
+                    <small>
+                        <strong>💡 Tip:</strong> Review urgent claims first (marked with 🚨)
+                        and high-value claims (>R50,000) carefully.
+                    </small>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<script>
-    let currentClaimId = null;
+@section Scripts {
+    <script>
+        let currentClaimId = null;
 
-    function reviewClaim(claimId) {
-        currentClaimId = claimId;
-        const claimData = {
-            1: {
-                lecturer: 'Dr. Sarah Johnson',
-                department: 'Computer Science',
-                period: 'April 2024',
-                hours: '128.0',
-                rate: 'R 450.00',
-                total: 'R 57,600.00',
-                submitted: '2024-04-02',
-                documents: ['📄 timesheet.pdf', '📊 attendance.xlsx', '📋 schedule.docx']
-            },
-            2: {
-                lecturer: 'Prof. Mike Wilson',
-                department: 'Computer Science',
-                period: 'April 2024',
-                hours: '145.5',
-                rate: 'R 450.00',
-                total: 'R 65,475.00',
-                submitted: '2024-04-01',
-                documents: ['📄 timesheet.pdf', '🖼️ class_photo.jpg']
-            },
-            3: {
-                lecturer: 'Dr. Jane Smith',
-                department: 'Computer Science',
-                period: 'March 2024',
-                hours: '156.0',
-                rate: 'R 450.00',
-                total: 'R 70,200.00',
-                submitted: '2024-03-28',
-                documents: ['📄 timesheet.pdf', '📊 attendance.xlsx', '📋 schedule.docx', '📧 email.pdf']
+        // Review a specific claim
+        function reviewClaim(claimId, lecturerName, period, hours, rate, total, notes, docCount, submittedDate, daysWaiting) {
+            currentClaimId = claimId;
+
+            // Highlight selected claim
+            document.querySelectorAll('.claim-review-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            document.querySelector(`[data-claim-id="${claimId}"]`).classList.add('selected');
+
+            // Populate details
+            const detailsHtml = `
+                <h6 class="fw-bold">${lecturerName}</h6>
+                <hr>
+                <p class="mb-2"><strong>Claim ID:</strong> CL-${claimId.toString().padStart(6, '0')}</p>
+                <p class="mb-2"><strong>Period:</strong> ${period}</p>
+                <p class="mb-2"><strong>Hours Worked:</strong> ${hours}</p>
+                <p class="mb-2"><strong>Hourly Rate:</strong> R ${parseFloat(rate).toFixed(2)}</p>
+                <p class="mb-2"><strong>Submitted:</strong> ${submittedDate}</p>
+                <p class="mb-2"><strong>Waiting:</strong> ${daysWaiting} day(s)</p>
+                <p class="mb-2"><strong>Documents:</strong> ${docCount} file(s)</p>
+                <hr>
+                <div class="alert alert-success">
+                    <strong>Total Amount:</strong><br>
+                    <h4 class="mb-0">R ${parseFloat(total).toFixed(2)}</h4>
+                </div>
+                ${notes ? `<div class="alert alert-info"><strong>Notes:</strong><br>${notes}</div>` : ''}
+            `;
+
+            document.getElementById('claimDetails').innerHTML = detailsHtml;
+            document.getElementById('reviewPanel').style.display = 'block';
+            document.getElementById('reviewComments').value = '';
+
+            // Scroll to review panel on mobile
+            if (window.innerWidth < 992) {
+                document.getElementById('reviewPanel').scrollIntoView({ behavior: 'smooth' });
             }
-        };
-
-        const claim = claimData[claimId];
-        const detailsHtml = `
-            <h6><strong>${claim.lecturer}</strong></h6>
-            <p class="mb-1"><strong>Department:</strong> ${claim.department}</p>
-            <p class="mb-1"><strong>Period:</strong> ${claim.period}</p>
-            <p class="mb-1"><strong>Hours:</strong> ${claim.hours}</p>
-            <p class="mb-1"><strong>Rate:</strong> ${claim.rate}</p>
-            <p class="mb-1"><strong>Total:</strong> <span class="text-success">${claim.total}</span></p>
-            <p class="mb-1"><strong>Submitted:</strong> ${claim.submitted}</p>
-            <p class="mb-2"><strong>Documents:</strong></p>
-            <ul class="small">
-                ${claim.documents.map(doc => `<li>${doc}</li>`).join('')}
-            </ul>
-        `;
-
-        document.getElementById('claimDetails').innerHTML = detailsHtml;
-        document.getElementById('reviewPanel').style.display = 'block';
-
-        // Highlight selected row
-        document.querySelectorAll('.claim-row').forEach(row => row.classList.remove('table-active'));
-        document.querySelector(`[data-claim-id="${claimId}"]`).classList.add('table-active');
-    }
-
-    function approveClaim() {
-        const comments = document.getElementById('reviewComments').value;
-        alert(`✅ Claim Approved!\n\nClaim ID: CL-2024-00${currentClaimId}\nComments: ${comments || 'No additional comments'}\n\nThe claim has been forwarded to the Academic Manager for final approval.\n\n⚠️ Visual Prototype Only`);
-
-        // Remove row from table (simulate processing)
-        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
-        document.getElementById('reviewPanel').style.display = 'none';
-    }
-
-    function rejectClaim() {
-        const comments = document.getElementById('reviewComments').value;
-        if (!comments.trim()) {
-            alert('Please provide rejection comments before rejecting the claim.');
-            return;
         }
 
-        alert(`❌ Claim Rejected!\n\nClaim ID: CL-2024-00${currentClaimId}\nReason: ${comments}\n\nThe lecturer will be notified via email with your feedback.\n\n⚠️ Visual Prototype Only`);
+        // Approve claim
+        function approveClaim() {
+            if (!currentClaimId) return;
 
-        // Remove row from table (simulate processing)
-        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
-        document.getElementById('reviewPanel').style.display = 'none';
-    }
+            const comments = document.getElementById('reviewComments').value;
 
-    function returnClaim() {
-        const comments = document.getElementById('reviewComments').value;
-        if (!comments.trim()) {
-            alert('Please provide comments explaining what needs to be corrected.');
-            return;
+            if (confirm(`✅ Approve this claim?\n\nClaim ID: CL-${currentClaimId.toString().padStart(6, '0')}\n\nThis will forward the claim for final processing.`)) {
+                submitApproval(currentClaimId, 'Approve', comments);
+            }
         }
 
-        alert(`↩️ Claim Returned for Revision!\n\nClaim ID: CL-2024-00${currentClaimId}\nInstructions: ${comments}\n\nThe lecturer can make corrections and resubmit.\n\n⚠️ Visual Prototype Only`);
+        // Reject claim
+        function rejectClaim() {
+            if (!currentClaimId) return;
 
-        // Remove row from table (simulate processing)
-        document.querySelector(`[data-claim-id="${currentClaimId}"]`).remove();
-        document.getElementById('reviewPanel').style.display = 'none';
-    }
+            const comments = document.getElementById('reviewComments').value.trim();
 
-    function viewDocuments() {
-        alert(`📎 Document Viewer\n\nThis would open a document viewer showing:\n• All uploaded supporting documents\n• Document preview functionality\n• Download options\n• Document verification tools\n\n⚠️ Visual Prototype Only`);
-    }
+            if (!comments) {
+                alert('⚠️ Please provide comments explaining why you are rejecting this claim.');
+                document.getElementById('reviewComments').focus();
+                return;
+            }
 
-    function toggleAllCheckboxes(masterCheckbox) {
-        const checkboxes = document.querySelectorAll('.claim-checkbox');
-        checkboxes.forEach(checkbox => {
-            checkbox.checked = masterCheckbox.checked;
+            if (confirm(`❌ Reject this claim?\n\nClaim ID: CL-${currentClaimId.toString().padStart(6, '0')}\n\nThe lecturer will be notified with your feedback.`)) {
+                submitApproval(currentClaimId, 'Reject', comments);
+            }
+        }
+
+        // Return claim for revision
+        function returnClaim() {
+            if (!currentClaimId) return;
+
+            const comments = document.getElementById('reviewComments').value.trim();
+
+            if (!comments) {
+                alert('⚠️ Please provide comments explaining what needs to be corrected.');
+                document.getElementById('reviewComments').focus();
+                return;
+            }
+
+            if (confirm(`↩️ Return this claim for revision?\n\nClaim ID: CL-${currentClaimId.toString().padStart(6, '0')}\n\nThe lecturer can make corrections and resubmit.`)) {
+                submitApproval(currentClaimId, 'Return', comments);
+            }
+        }
+
+        // Submit approval decision
+        function submitApproval(claimId, action, comments) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("ProcessApproval", "Home")';
+
+            const fields = {
+                '__RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value,
+                'claimId': claimId,
+                'action': action,
+                'comments': comments
+            };
+
+            for (const key in fields) {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = key;
+                input.value = fields[key];
+                form.appendChild(input);
+            }
+
+            document.body.appendChild(form);
+            form.submit();
+        }
+
+        // Quick approve
+        function quickApprove(claimId, lecturerName) {
+            if (confirm(`✅ Quick Approve\n\nApprove claim for ${lecturerName}?\n\nClaim ID: CL-${claimId.toString().padStart(6, '0')}`)) {
+                submitApproval(claimId, 'Approve', 'Quick approval - all requirements met');
+            }
+        }
+
+        // Quick reject
+        function quickReject(claimId, lecturerName) {
+            const reason = prompt(`❌ Quick Reject\n\nRejecting claim for ${lecturerName}\n\nPlease provide a reason:`);
+
+            if (reason && reason.trim()) {
+                submitApproval(claimId, 'Reject', reason);
+            } else if (reason !== null) {
+                alert('⚠️ A reason is required to reject a claim.');
+            }
+        }
+
+        // Close review panel
+        function closeReview() {
+            document.getElementById('reviewPanel').style.display = 'none';
+            document.querySelectorAll('.claim-review-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            currentClaimId = null;
+        }
+
+        // Checkbox management
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('claim-checkbox')) {
+                updateSelectedCount();
+            }
         });
-    }
 
-    function bulkApprove() {
-        const checkedBoxes = document.querySelectorAll('.claim-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Please select at least one claim to approve.');
-            return;
+        function updateSelectedCount() {
+            const count = document.querySelectorAll('.claim-checkbox:checked').length;
+            document.getElementById('selectedCount').textContent = `${count} claim(s) selected`;
         }
 
-        alert(`✅ Bulk Approval\n\n${checkedBoxes.length} claim(s) will be approved and forwarded to the Academic Manager.\n\n⚠️ Visual Prototype Only`);
-    }
-
-    function bulkReject() {
-        const checkedBoxes = document.querySelectorAll('.claim-checkbox:checked');
-        if (checkedBoxes.length === 0) {
-            alert('Please select at least one claim to reject.');
-            return;
+        function selectAll() {
+            document.querySelectorAll('.claim-checkbox').forEach(cb => cb.checked = true);
+            updateSelectedCount();
         }
 
-        alert(`❌ Bulk Rejection\n\n${checkedBoxes.length} claim(s) will be rejected. Please ensure you have provided individual feedback for each claim.\n\n⚠️ Visual Prototype Only`);
-    }
-</script>
+        function clearSelection() {
+            document.querySelectorAll('.claim-checkbox').forEach(cb => cb.checked = false);
+            updateSelectedCount();
+        }
+
+        // Bulk actions
+        function bulkApprove() {
+            const selected = Array.from(document.querySelectorAll('.claim-checkbox:checked'));
+
+            if (selected.length === 0) {
+                alert('⚠️ Please select at least one claim to approve.');
+                return;
+            }
+
+            if (confirm(`✅ Bulk Approve\n\nApprove ${selected.length} claim(s)?\n\nAll selected claims will be forwarded for processing.`)) {
+                const comments = 'Bulk approval - all requirements met';
+                selected.forEach(cb => {
+                    const claimId = cb.getAttribute('data-claim-id');
+                    submitApproval(claimId, 'Approve', comments);
+                });
+            }
+        }
+
+        function bulkReject() {
+            const selected = Array.from(document.querySelectorAll('.claim-checkbox:checked'));
+
+            if (selected.length === 0) {
+                alert('⚠️ Please select at least one claim to reject.');
+                return;
+            }
+
+            const reason = prompt(`❌ Bulk Reject\n\nRejecting ${selected.length} claim(s)\n\nPlease provide a reason:`);
+
+            if (reason && reason.trim()) {
+                selected.forEach(cb => {
+                    const claimId = cb.getAttribute('data-claim-id');
+                    submitApproval(claimId, 'Reject', reason);
+                });
+            }
+        }
+
+        // Filter claims
+        function filterClaims() {
+            const filter = document.getElementById('priorityFilter').value;
+            const claims = document.querySelectorAll('.claim-review-card');
+
+            claims.forEach(claim => {
+                const days = parseInt(claim.getAttribute('data-days'));
+                const amount = parseFloat(claim.getAttribute('data-amount'));
+                let show = true;
+
+                switch(filter) {
+                    case 'urgent':
+                        show = days > 7;
+                        break;
+                    case 'high-value':
+                        show = amount > 50000;
+                        break;
+                    case 'recent':
+                        show = days <= 3;
+                        break;
+                }
+
+                claim.style.display = show ? 'block' : 'none';
+            });
+        }
+
+        // Sort claims
+        function sortClaims() {
+            const sortOrder = document.getElementById('sortOrder').value;
+            const container = document.getElementById('claimsList');
+            const claims = Array.from(container.querySelectorAll('.claim-review-card'));
+
+            claims.sort((a, b) => {
+                switch(sortOrder) {
+                    case 'date-asc':
+                        return parseInt(a.getAttribute('data-date')) - parseInt(b.getAttribute('data-date'));
+                    case 'date-desc':
+                        return parseInt(b.getAttribute('data-date')) - parseInt(a.getAttribute('data-date'));
+                    case 'amount-desc':
+                        return parseFloat(b.getAttribute('data-amount')) - parseFloat(a.getAttribute('data-amount'));
+                    case 'amount-asc':
+                        return parseFloat(a.getAttribute('data-amount')) - parseFloat(b.getAttribute('data-amount'));
+                    default:
+                        return 0;
+                }
+            });
+
+            claims.forEach(claim => container.appendChild(claim));
+        }
+
+        // Search claims
+        function searchClaims() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const claims = document.querySelectorAll('.claim-review-card');
+
+            claims.forEach(claim => {
+                const lecturer = claim.getAttribute('data-lecturer').toLowerCase();
+                claim.style.display = lecturer.includes(search) ? 'block' : 'none';
+            });
+        }
+    </script>
+
+    @Html.AntiForgeryToken()
+}

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProgPOE.Models
 {
@@ -11,23 +12,25 @@ namespace ProgPOE.Models
 
         [Required]
         [StringLength(255)]
-        public string FileName { get; set; }
+        public string FileName { get; set; } = string.Empty;
 
         [Required]
         [StringLength(10)]
-        public string FileType { get; set; } // PDF, DOC, DOCX, JPG, PNG
+        public string FileType { get; set; } = string.Empty;
 
         [Required]
-        public long FileSize { get; set; } // In bytes
+        public long FileSize { get; set; }
 
         [Required]
-        public string FilePath { get; set; }
+        [StringLength(500)]
+        public string FilePath { get; set; } = string.Empty;
 
-        public DateTime UploadDate { get; set; }
+        public DateTime UploadDate { get; set; } = DateTime.Now;
 
         public bool IsActive { get; set; } = true;
 
-        // Helper methods for display
+        public virtual Claim? Claim { get; set; }
+
         public string GetFileSizeFormatted()
         {
             if (FileSize < 1024) return $"{FileSize} B";

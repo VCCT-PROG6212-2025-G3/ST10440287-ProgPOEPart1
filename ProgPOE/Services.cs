@@ -1,139 +1,181 @@
-﻿using ProgPOE.Controllers;
+﻿using Microsoft.EntityFrameworkCore;
+using ProgPOE.Data;
 using ProgPOE.Models;
 
-namespace ProgPOE
+namespace ProgPOE.Services
 {
     public interface IClaimService
     {
         Task<List<Claim>> GetUserClaimsAsync(int userId);
         Task<List<Claim>> GetPendingClaimsAsync();
-        Task<bool> SubmitClaimAsync(SubmitClaimViewModel model);
-        Task<bool> ProcessApprovalAsync(int claimId, ApprovalAction action, string comments);
         Task<DashboardViewModel> GetDashboardDataAsync(int userId);
+        Task<Claim> GetClaimByIdAsync(int claimId);
+        Task<bool> ProcessApprovalAsync(int claimId, ApprovalAction action, string comments, int approverId);
     }
 
     public class ClaimService : IClaimService
     {
-        // Note: This is a non-functional prototype - no real database operations
+        private readonly ApplicationDbContext _context;
+        private readonly ILogger<ClaimService> _logger;
+
+        public ClaimService(ApplicationDbContext context, ILogger<ClaimService> logger)
+        {
+            _context = context;
+            _logger = logger;
+        }
 
         public async Task<List<Claim>> GetUserClaimsAsync(int userId)
         {
-            // Simulate async operation
-            await Task.Delay(100);
+            try
+            {
+                var claims = await _context.Claims
+                    .Include(c => c.Lecturer)
+                    .Include(c => c.Documents)
+                    .Where(c => c.LecturerId == userId)
+                    .OrderByDescending(c => c.SubmissionDate)
+                    .ToListAsync();
 
-            // Return sample data for prototype
-            return GetSampleUserClaims();
+                _logger.LogInformation($"Retrieved {claims.Count} claims for user {userId}");
+                return claims;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving claims for user {userId}");
+                return new List<Claim>();
+            }
         }
 
         public async Task<List<Claim>> GetPendingClaimsAsync()
         {
-            // Simulate async operation
-            await Task.Delay(100);
-
-            // Return sample pending claims
-            return GetSamplePendingClaims();
-        }
-
-        public async Task<bool> SubmitClaimAsync(SubmitClaimViewModel model)
-        {
-            // Simulate async operation
-            await Task.Delay(500);
-
-            // In real implementation, this would:
-            // 1. Validate the claim
-            // 2. Save to database
-            // 3. Upload documents
-            // 4. Send notifications
-
-            return true; // Always success in prototype
-        }
-
-        public async Task<bool> ProcessApprovalAsync(int claimId, ApprovalAction action, string comments)
-        {
-            // Simulate async operation
-            await Task.Delay(300);
-
-            // In real implementation, this would:
-            // 1. Update claim status
-            // 2. Record approval history
-            // 3. Send notifications
-            // 4. Update workflow
-
-            return true; // Always success in prototype
+            try
+            {
+                return await _context.Claims
+                    .Include(c => c.Lecturer)
+                    .Include(c => c.Documents)
+                    .Where(c => c.Status == ClaimStatus.Pending || c.Status == ClaimStatus.PendingManager)
+                    .OrderBy(c => c.SubmissionDate)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving pending claims");
+                return new List<Claim>();
+            }
         }
 
         public async Task<DashboardViewModel> GetDashboardDataAsync(int userId)
         {
-            // Simulate async operation
-            await Task.Delay(200);
-
-            // Return sample dashboard data
-            return new DashboardViewModel
+            try
             {
-                UserRole = "Lecturer",
-                UserName = "Dr. John Smith",
-                TotalClaims = 8,
-                PendingClaims = 2,
-                ApprovedClaims = 5,
-                RejectedClaims = 1,
-                TotalEarnings = 284500.00m
-            };
+                var user = await _context.Users.FindAsync(userId);
+                var claims = await _context.Claims
+                    .Where(c => c.LecturerId == userId)
+                    .ToListAsync();
+
+                return new DashboardViewModel
+                {
+                    UserRole = user?.Role.ToString() ?? "Lecturer",
+                    UserName = user?.FullName ?? "Unknown User",
+                    TotalClaims = claims.Count,
+                    PendingClaims = claims.Count(c => c.Status == ClaimStatus.Pending || c.Status == ClaimStatus.PendingManager),
+                    ApprovedClaims = claims.Count(c => c.Status == ClaimStatus.Approved),
+                    RejectedClaims = claims.Count(c => c.Status == ClaimStatus.Rejected),
+                    TotalEarnings = claims.Where(c => c.Status == ClaimStatus.Approved).Sum(c => c.TotalAmount)
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting dashboard data for user {userId}");
+                return new DashboardViewModel
+                {
+                    UserRole = "Lecturer",
+                    UserName = "Unknown User",
+                    TotalClaims = 0,
+                    PendingClaims = 0,
+                    ApprovedClaims = 0,
+                    RejectedClaims = 0,
+                    TotalEarnings = 0
+                };
+            }
         }
 
-        // Helper methods for sample data
-        private List<Claim> GetSampleUserClaims()
+        public async Task<Claim> GetClaimByIdAsync(int claimId)
         {
-            return new List<Claim>
+            try
             {
-                new Claim
-                {
-                    ClaimId = 1,
-                    MonthYear = "2024-04",
-                    HoursWorked = 125.5m,
-                    HourlyRate = 450.00m,
-                    Status = ClaimStatus.Pending,
-                    SubmissionDate = DateTime.Now.AddDays(-3),
-                    Lecturer = new User("Dr. John", "Smith")
-                },
-                new Claim
-                {
-                    ClaimId = 2,
-                    MonthYear = "2024-03",
-                    HoursWorked = 118.0m,
-                    HourlyRate = 450.00m,
-                    Status = ClaimStatus.Approved,
-                    SubmissionDate = DateTime.Now.AddDays(-35),
-                    Lecturer = new User("Dr. John", "Smith")
-                }
-            };
+                return await _context.Claims
+                    .Include(c => c.Lecturer)
+                    .Include(c => c.Documents)
+                    .FirstOrDefaultAsync(c => c.ClaimId == claimId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error getting claim {claimId}");
+                return null;
+            }
         }
 
-        private List<Claim> GetSamplePendingClaims()
+        public async Task<bool> ProcessApprovalAsync(int claimId, ApprovalAction action, string comments, int approverId)
         {
-            return new List<Claim>
+            try
             {
-                new Claim
+                var claim = await _context.Claims.FindAsync(claimId);
+                if (claim == null)
                 {
-                    ClaimId = 3,
-                    MonthYear = "2024-04",
-                    HoursWorked = 142.0m,
-                    HourlyRate = 420.00m,
-                    Status = ClaimStatus.Pending,
-                    SubmissionDate = DateTime.Now.AddDays(-2),
-                    Lecturer = new User("Dr. Jane", "Wilson")
+                    _logger.LogWarning($"Claim {claimId} not found");
+                    return false;
                 }
-            };
+
+                var approver = await _context.Users.FindAsync(approverId);
+                if (approver == null)
+                {
+                    _logger.LogWarning($"Approver {approverId} not found");
+                    return false;
+                }
+
+                switch (action)
+                {
+                    case ApprovalAction.Approve:
+                        if (approver.Role == UserRole.ProgrammeCoordinator)
+                        {
+                            claim.Status = ClaimStatus.PendingManager;
+                            claim.CoordinatorApprovalDate = DateTime.Now;
+                            claim.CoordinatorNotes = comments;
+                        }
+                        else if (approver.Role == UserRole.AcademicManager)
+                        {
+                            claim.Status = ClaimStatus.Approved;
+                            claim.ManagerApprovalDate = DateTime.Now;
+                            claim.ManagerNotes = comments;
+                        }
+                        break;
+
+                    case ApprovalAction.Reject:
+                        claim.Status = ClaimStatus.Rejected;
+                        if (approver.Role == UserRole.ProgrammeCoordinator)
+                            claim.CoordinatorNotes = comments;
+                        else
+                            claim.ManagerNotes = comments;
+                        break;
+
+                    case ApprovalAction.Return:
+                        claim.Status = ClaimStatus.Returned;
+                        if (approver.Role == UserRole.ProgrammeCoordinator)
+                            claim.CoordinatorNotes = comments;
+                        else
+                            claim.ManagerNotes = comments;
+                        break;
+                }
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation($"Claim {claimId} processed successfully");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing approval for claim {claimId}");
+                return false;
+            }
         }
-    }
-    // Update the accessibility of the DashboardViewModel class to match the accessibility of the method using it.
-    public class DashboardViewModel
-    {
-        public string UserRole { get; set; }
-        public string UserName { get; set; }
-        public int TotalClaims { get; set; }
-        public int PendingClaims { get; set; }
-        public int ApprovedClaims { get; set; }
-        public int RejectedClaims { get; set; }
-        public decimal TotalEarnings { get; set; }
     }
 }
