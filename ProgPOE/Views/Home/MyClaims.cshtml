@@ -239,13 +239,6 @@ else
                                class="btn btn-sm btn-primary w-100 mb-2">
                                 👁️ View Details & Track Status
                             </a>
-
-                            @if (claim.Status == ProgPOE.Models.ClaimStatus.Approved)
-                            {
-                                <button class="btn btn-sm btn-outline-success w-100" onclick="downloadReceipt(@claim.ClaimId)">
-                                    💾 Download Receipt
-                                </button>
-                            }
                         </div>
                     </div>
                 </div>
@@ -281,10 +274,6 @@ else
                     item.style.display = 'none';
                 }
             });
-        }
-
-        function downloadReceipt(claimId) {
-            alert('💾 Download Receipt\n\nDownloading receipt for Claim ID: CL-' + claimId.toString().padStart(6, '0') + '\n\n⚠️ Feature coming soon!');
         }
 
         // Auto-refresh pending claims every 60 seconds

@@ -1,5 +1,4 @@
-﻿@* Views/Home/Dashboard.cshtml - Dashboard View *@
-@model ProgPOE.Models.DashboardViewModel
+﻿@model ProgPOE.Models.DashboardViewModel
 @{
     ViewData["Title"] = "Dashboard";
     Layout = "~/Views/Shared/_Layout.cshtml";
@@ -61,26 +60,75 @@
             </div>
             <div class="card-body">
                 <div class="row">
-                    <div class="col-md-3">
-                        <a href="@Url.Action("SubmitClaim", "Home")" class="btn btn-primary btn-lg w-100 mb-2">
-                            📝 Submit New Claim
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info btn-lg w-100 mb-2">
-                            📋 View My Claims
-                        </a>
-                    </div>
-                    <div class="col-md-3">
-                        <button class="btn btn-success btn-lg w-100 mb-2" onclick="uploadDocuments()">
-                            📎 Upload Documents
-                        </button>
-                    </div>
-                    <div class="col-md-3">
-                        <a href="@Url.Action("ApproveClaims", "Home")" class="btn btn-warning btn-lg w-100 mb-2">
-                            ✅ Review Claims
-                        </a>
-                    </div>
+                    @if (Model.UserRole == "Lecturer")
+                    {
+                        <div class="col-md-3">
+                            <a href="@Url.Action("SubmitClaim", "Home")" class="btn btn-primary btn-lg w-100 mb-2">
+                                📝 Submit New Claim
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info btn-lg w-100 mb-2">
+                                📋 View My Claims
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="@Url.Action("MyClaims", "Home")" class="btn btn-success btn-lg w-100 mb-2">
+                                📊 Track Status
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-secondary btn-lg w-100 mb-2" onclick="showHelp()">
+                                ❓ Help
+                            </button>
+                        </div>
+                    }
+                    else if (Model.UserRole == "ProgrammeCoordinator")
+                    {
+                        <div class="col-md-3">
+                            <a href="@Url.Action("ApproveClaims", "Home")" class="btn btn-warning btn-lg w-100 mb-2">
+                                ✅ Review Claims
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info btn-lg w-100 mb-2">
+                                📋 View All Claims
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success btn-lg w-100 mb-2" onclick="showStatistics()">
+                                📊 View Statistics
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-secondary btn-lg w-100 mb-2" onclick="showHelp()">
+                                ❓ Help
+                            </button>
+                        </div>
+                    }
+                    else if (Model.UserRole == "AcademicManager")
+                    {
+                        <div class="col-md-3">
+                            <a href="@Url.Action("ApproveClaims", "Home")" class="btn btn-warning btn-lg w-100 mb-2">
+                                ✅ Review Claims
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <a href="@Url.Action("MyClaims", "Home")" class="btn btn-info btn-lg w-100 mb-2">
+                                📋 View All Claims
+                            </a>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-success btn-lg w-100 mb-2" onclick="showStatistics()">
+                                📊 View Statistics
+                            </button>
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-outline-secondary btn-lg w-100 mb-2" onclick="showHelp()">
+                                ❓ Help
+                            </button>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -92,33 +140,85 @@
     <div class="col-md-12">
         <div class="card">
             <div class="card-header">
-                <h5>📈 Recent Activity</h5>
+                <h5>📈 System Overview</h5>
             </div>
             <div class="card-body">
-                <div class="list-group">
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">📤 Claim submitted for April 2024</h6>
-                            <small>3 days ago</small>
-                        </div>
-                        <p class="mb-1">125.5 hours at R450/hour = R56,475.00</p>
-                        <small class="text-warning">Status: Pending Coordinator Review</small>
+                @if (Model.UserRole == "Lecturer")
+                {
+                    <div class="alert alert-info">
+                        <h6><strong>📝 Getting Started</strong></h6>
+                        <p class="mb-1">1. Click <strong>"Submit New Claim"</strong> to create your monthly claim</p>
+                        <p class="mb-1">2. Upload supporting documents (timesheets, attendance records)</p>
+                        <p class="mb-1">3. Track your claim status in <strong>"My Claims"</strong></p>
+                        <p class="mb-0">4. Receive notifications when your claim is approved</p>
                     </div>
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">✅ Claim approved for March 2024</h6>
-                            <small>1 week ago</small>
-                        </div>
-                        <p class="mb-1">118 hours at R450/hour = R53,100.00</p>
-                        <small class="text-success">Status: Approved - Payment processed</small>
+                }
+                else if (Model.UserRole == "ProgrammeCoordinator")
+                {
+                    <div class="alert alert-warning">
+                        <h6><strong>👤 Coordinator Responsibilities</strong></h6>
+                        <p class="mb-1">1. Review pending claims submitted by lecturers</p>
+                        <p class="mb-1">2. Verify hours worked and supporting documents</p>
+                        <p class="mb-1">3. Approve claims to forward to Academic Manager</p>
+                        <p class="mb-0">4. Reject or return claims that need revision</p>
+                        <hr>
+                        <p class="mb-0 text-center">
+                            <strong>⏳ Pending Your Review: @Model.PendingClaims claim(s)</strong>
+                        </p>
                     </div>
-                    <div class="list-group-item">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">📎 Documents uploaded for February 2024</h6>
-                            <small>2 weeks ago</small>
+                }
+                else if (Model.UserRole == "AcademicManager")
+                {
+                    <div class="alert alert-success">
+                        <h6><strong>👔 Manager Responsibilities</strong></h6>
+                        <p class="mb-1">1. Review claims approved by Programme Coordinators</p>
+                        <p class="mb-1">2. Provide final approval for payment processing</p>
+                        <p class="mb-1">3. Monitor overall claim statistics and trends</p>
+                        <p class="mb-0">4. Ensure compliance with university policies</p>
+                        <hr>
+                        <p class="mb-0 text-center">
+                            <strong>⏳ Pending Your Approval: @Model.PendingClaims claim(s)</strong>
+                        </p>
+                    </div>
+                }
+
+                <div class="row mt-3">
+                    <div class="col-md-12">
+                        <h6><strong>📊 Quick Stats Summary</strong></h6>
+                        <div class="row">
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-primary">@Model.TotalClaims</h4>
+                                        <small>Total Claims</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-warning">@Model.PendingClaims</h4>
+                                        <small>Pending Review</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-success">@Model.ApprovedClaims</h4>
+                                        <small>Approved</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h4 class="text-danger">@Model.RejectedClaims</h4>
+                                        <small>Rejected</small>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <p class="mb-1">Added timesheet.pdf and attendance_record.xlsx</p>
-                        <small class="text-info">Documents processed successfully</small>
                     </div>
                 </div>
             </div>
@@ -126,8 +226,46 @@
     </div>
 </div>
 
-<script>
-    function uploadDocuments() {
-        alert('📎 Document Upload Feature\n\nThis would open a file upload dialog where lecturers can:\n• Upload PDF, DOC, DOCX, JPG, PNG files\n• Add multiple documents per claim\n• Track upload progress\n• View uploaded documents\n\n⚠️ Visual Prototype Only - No actual upload occurs.');
-    }
-</script>
+@section Scripts {
+    <script>
+        function showStatistics() {
+            alert('📊 System Statistics\n\n' +
+                'Total Claims: @Model.TotalClaims\n' +
+                'Pending: @Model.PendingClaims\n' +
+                'Approved: @Model.ApprovedClaims\n' +
+                'Rejected: @Model.RejectedClaims\n' +
+                'Total Earnings: @Model.FormattedEarnings\n\n' +
+                '⚠️ Detailed analytics coming soon!');
+        }
+
+        function showHelp() {
+            var helpMessage = '';
+            var userRole = '@Model.UserRole';
+
+            if (userRole === 'Lecturer') {
+                helpMessage = '❓ Lecturer Help Guide\n\n' +
+                    '1. Submit Claims: Click "Submit New Claim" to create a new monthly claim\n' +
+                    '2. Upload Documents: Attach timesheets and attendance records\n' +
+                    '3. Track Status: Monitor your claim progress in "My Claims"\n' +
+                    '4. View Details: Click on any claim to see full details and timeline\n\n' +
+                    'Need more help? Contact your Programme Coordinator.';
+            } else if (userRole === 'ProgrammeCoordinator') {
+                helpMessage = '❓ Coordinator Help Guide\n\n' +
+                    '1. Review Claims: Go to "Review Claims" to see pending submissions\n' +
+                    '2. Verify Information: Check hours worked and supporting documents\n' +
+                    '3. Approve/Reject: Make your decision with optional comments\n' +
+                    '4. Track Progress: Monitor all claims in "View All Claims"\n\n' +
+                    'Questions? Contact the Academic Manager.';
+            } else if (userRole === 'AcademicManager') {
+                helpMessage = '❓ Manager Help Guide\n\n' +
+                    '1. Final Review: Review coordinator-approved claims\n' +
+                    '2. Final Approval: Approve claims for payment processing\n' +
+                    '3. Monitor System: View overall statistics and trends\n' +
+                    '4. Manage Process: Ensure smooth workflow\n\n' +
+                    'Need assistance? Contact IT Support.';
+            }
+
+            alert(helpMessage);
+        }
+    </script>
+}

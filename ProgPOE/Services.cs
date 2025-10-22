@@ -28,11 +28,13 @@ namespace ProgPOE.Services
         {
             try
             {
+                // Get ALL claims for the user, regardless of status
                 var claims = await _context.Claims
                     .Include(c => c.Lecturer)
                     .Include(c => c.Documents)
                     .Where(c => c.LecturerId == userId)
                     .OrderByDescending(c => c.SubmissionDate)
+                    .AsNoTracking() // Ensure we get fresh data
                     .ToListAsync();
 
                 _logger.LogInformation($"Retrieved {claims.Count} claims for user {userId}");
@@ -54,6 +56,7 @@ namespace ProgPOE.Services
                     .Include(c => c.Documents)
                     .Where(c => c.Status == ClaimStatus.Pending || c.Status == ClaimStatus.PendingManager)
                     .OrderBy(c => c.SubmissionDate)
+                    .AsNoTracking()
                     .ToListAsync();
             }
             catch (Exception ex)
@@ -67,24 +70,29 @@ namespace ProgPOE.Services
         {
             try
             {
-                var user = await _context.Users.FindAsync(userId);
+                var user = await _context.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
 
-                // Get claims based on user role
+                // Get claims based on user role with fresh data
                 List<Claim> claims;
                 if (user?.Role == UserRole.Lecturer)
                 {
                     // Lecturers see only their own claims
                     claims = await _context.Claims
+                        .AsNoTracking()
                         .Where(c => c.LecturerId == userId)
                         .ToListAsync();
                 }
                 else
                 {
                     // Coordinators and Managers see all claims
-                    claims = await _context.Claims.ToListAsync();
+                    claims = await _context.Claims
+                        .AsNoTracking()
+                        .ToListAsync();
                 }
 
-                return new DashboardViewModel
+                var dashboardData = new DashboardViewModel
                 {
                     UserRole = user?.Role.ToString() ?? "Lecturer",
                     UserName = user?.FullName ?? "Unknown User",
@@ -94,6 +102,10 @@ namespace ProgPOE.Services
                     RejectedClaims = claims.Count(c => c.Status == ClaimStatus.Rejected),
                     TotalEarnings = claims.Where(c => c.Status == ClaimStatus.Approved).Sum(c => c.TotalAmount)
                 };
+
+                _logger.LogInformation($"Dashboard data for user {userId}: Total={dashboardData.TotalClaims}, Pending={dashboardData.PendingClaims}, Approved={dashboardData.ApprovedClaims}, Rejected={dashboardData.RejectedClaims}");
+
+                return dashboardData;
             }
             catch (Exception ex)
             {
@@ -115,9 +127,11 @@ namespace ProgPOE.Services
         {
             try
             {
+                // Always get fresh data from database
                 return await _context.Claims
                     .Include(c => c.Lecturer)
                     .Include(c => c.Documents)
+                    .AsNoTracking()
                     .FirstOrDefaultAsync(c => c.ClaimId == claimId);
             }
             catch (Exception ex)
@@ -131,6 +145,7 @@ namespace ProgPOE.Services
         {
             try
             {
+                // Get claim with tracking enabled for updates
                 var claim = await _context.Claims.FindAsync(claimId);
                 if (claim == null)
                 {
@@ -145,6 +160,9 @@ namespace ProgPOE.Services
                     return false;
                 }
 
+                _logger.LogInformation($"Processing {action} for Claim {claimId} by {approver.FullName} ({approver.Role})");
+                _logger.LogInformation($"Current Status: {claim.Status}");
+
                 switch (action)
                 {
                     case ApprovalAction.Approve:
@@ -152,15 +170,15 @@ namespace ProgPOE.Services
                         {
                             claim.Status = ClaimStatus.PendingManager;
                             claim.CoordinatorApprovalDate = DateTime.Now;
-                            claim.CoordinatorNotes = comments;
-                            _logger.LogInformation($"Claim {claimId} approved by coordinator, moved to PendingManager");
+                            claim.CoordinatorNotes = string.IsNullOrEmpty(comments) ? "Approved by coordinator" : comments;
+                            _logger.LogInformation($"Claim {claimId} approved by coordinator, status changed from {ClaimStatus.Pending} to {ClaimStatus.PendingManager}");
                         }
                         else if (approver.Role == UserRole.AcademicManager)
                         {
                             claim.Status = ClaimStatus.Approved;
                             claim.ManagerApprovalDate = DateTime.Now;
-                            claim.ManagerNotes = comments;
-                            _logger.LogInformation($"Claim {claimId} approved by manager, status set to Approved");
+                            claim.ManagerNotes = string.IsNullOrEmpty(comments) ? "Approved by manager" : comments;
+                            _logger.LogInformation($"Claim {claimId} approved by manager, status changed from {ClaimStatus.PendingManager} to {ClaimStatus.Approved}");
                         }
                         break;
 
@@ -168,35 +186,42 @@ namespace ProgPOE.Services
                         claim.Status = ClaimStatus.Rejected;
                         if (approver.Role == UserRole.ProgrammeCoordinator)
                         {
-                            claim.CoordinatorNotes = comments;
+                            claim.CoordinatorNotes = string.IsNullOrEmpty(comments) ? "Rejected by coordinator" : comments;
                             claim.CoordinatorApprovalDate = DateTime.Now;
+                            _logger.LogInformation($"Claim {claimId} rejected by coordinator");
                         }
                         else
                         {
-                            claim.ManagerNotes = comments;
+                            claim.ManagerNotes = string.IsNullOrEmpty(comments) ? "Rejected by manager" : comments;
                             claim.ManagerApprovalDate = DateTime.Now;
+                            _logger.LogInformation($"Claim {claimId} rejected by manager");
                         }
-                        _logger.LogInformation($"Claim {claimId} rejected by {approver.Role}");
                         break;
 
                     case ApprovalAction.Return:
                         claim.Status = ClaimStatus.Returned;
                         if (approver.Role == UserRole.ProgrammeCoordinator)
                         {
-                            claim.CoordinatorNotes = comments;
+                            claim.CoordinatorNotes = string.IsNullOrEmpty(comments) ? "Returned for revision" : comments;
                             claim.CoordinatorApprovalDate = DateTime.Now;
                         }
                         else
                         {
-                            claim.ManagerNotes = comments;
+                            claim.ManagerNotes = string.IsNullOrEmpty(comments) ? "Returned for revision" : comments;
                             claim.ManagerApprovalDate = DateTime.Now;
                         }
                         _logger.LogInformation($"Claim {claimId} returned by {approver.Role}");
                         break;
                 }
 
+                // Save changes and verify
                 await _context.SaveChangesAsync();
+
+                // Verify the update
+                var updatedClaim = await _context.Claims.AsNoTracking().FirstOrDefaultAsync(c => c.ClaimId == claimId);
+                _logger.LogInformation($"Claim {claimId} status after save: {updatedClaim?.Status}");
                 _logger.LogInformation($"Claim {claimId} processed successfully by {approver.FullName}");
+
                 return true;
             }
             catch (Exception ex)

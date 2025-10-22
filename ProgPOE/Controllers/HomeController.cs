@@ -64,6 +64,7 @@ namespace ProgPOE.Controllers
                 TempData["Success"] = $"Switched to {user.FullName} ({user.Role})";
                 _logger.LogInformation($"Role switched to {user.FullName} ({user.Role})");
 
+                // Redirect to Dashboard to see updated data
                 return RedirectToAction("Dashboard");
             }
             catch (Exception ex)
@@ -75,6 +76,7 @@ namespace ProgPOE.Controllers
         }
 
         // GET: Home/Dashboard
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> Dashboard()
         {
             try
@@ -83,6 +85,9 @@ namespace ProgPOE.Controllers
 
                 var dashboardData = await _claimService.GetDashboardDataAsync(userId);
                 ViewBag.CurrentUser = GetCurrentUserInfo();
+
+                _logger.LogInformation($"Dashboard loaded for user {userId}: {dashboardData.TotalClaims} total claims");
+
                 return View(dashboardData);
             }
             catch (Exception ex)
@@ -173,6 +178,7 @@ namespace ProgPOE.Controllers
         }
 
         // GET: Home/MyClaims
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> MyClaims()
         {
             try
@@ -180,6 +186,9 @@ namespace ProgPOE.Controllers
                 int userId = GetCurrentUserId();
                 var claims = await _claimService.GetUserClaimsAsync(userId);
                 ViewBag.CurrentUser = GetCurrentUserInfo();
+
+                _logger.LogInformation($"My Claims loaded for user {userId}: {claims.Count} claims found");
+
                 return View(claims);
             }
             catch (Exception ex)
@@ -191,6 +200,7 @@ namespace ProgPOE.Controllers
         }
 
         // GET: Home/ViewClaim/5
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> ViewClaim(int id)
         {
             try
@@ -214,6 +224,9 @@ namespace ProgPOE.Controllers
                 }
 
                 ViewBag.CurrentUser = GetCurrentUserInfo();
+
+                _logger.LogInformation($"Viewing Claim {id}: Status = {claim.Status}");
+
                 return View(claim);
             }
             catch (Exception ex)
@@ -225,6 +238,7 @@ namespace ProgPOE.Controllers
         }
 
         // GET: Home/ApproveClaims
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public async Task<IActionResult> ApproveClaims()
         {
             try
@@ -252,6 +266,9 @@ namespace ProgPOE.Controllers
                 }
 
                 ViewBag.CurrentUser = GetCurrentUserInfo();
+
+                _logger.LogInformation($"Approve Claims loaded for {userRole}: {pendingClaims.Count} claims to review");
+
                 return View(pendingClaims);
             }
             catch (Exception ex)
@@ -277,6 +294,8 @@ namespace ProgPOE.Controllers
                     TempData["Error"] = "You don't have permission to approve claims.";
                     return RedirectToAction("Dashboard");
                 }
+
+                _logger.LogInformation($"Processing approval: ClaimId={claimId}, Action={action}, Approver={approverId}");
 
                 var result = await _claimService.ProcessApprovalAsync(claimId, action, comments, approverId);
 
