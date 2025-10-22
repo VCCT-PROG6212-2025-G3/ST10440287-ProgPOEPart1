@@ -68,7 +68,7 @@ namespace ProgPOE
                 {
                     logger.LogError(ex, "An error occurred creating/seeding the database.");
                     logger.LogError($"Inner Exception: {ex.InnerException?.Message}");
-                    throw; // Re-throw to see the full error
+                    throw;
                 }
             }
 
@@ -147,31 +147,7 @@ namespace ProgPOE
                     logger.LogInformation($"Seeded {users.Count} users successfully");
                 }
 
-                // Optional: Seed a test claim
-                if (!context.Claims.Any())
-                {
-                    logger.LogInformation("Seeding test claim...");
-
-                    var testClaim = new Claim
-                    {
-                        LecturerId = 1,
-                        MonthYear = "2024-09",
-                        HoursWorked = 100.0m,
-                        HourlyRate = 450.00m,
-                        Status = ClaimStatus.Approved,
-                        SubmissionDate = DateTime.Now.AddDays(-30),
-                        CoordinatorApprovalDate = DateTime.Now.AddDays(-25),
-                        ManagerApprovalDate = DateTime.Now.AddDays(-20),
-                        LecturerNotes = "September teaching hours",
-                        CoordinatorNotes = "Approved by coordinator",
-                        ManagerNotes = "Final approval granted"
-                    };
-
-                    context.Claims.Add(testClaim);
-                    context.SaveChanges();
-
-                    logger.LogInformation("Test claim seeded successfully");
-                }
+                logger.LogInformation("Database seeding completed - no test claims added");
             }
             catch (Exception ex)
             {
@@ -189,10 +165,4 @@ namespace ProgPOE
 // - Bootstrap Documentation: https://getbootstrap.com/docs/5.1/getting-started/introduction/
 // - jQuery Documentation: https://api.jquery.com/
 // - File Upload Security: https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload
-// - ChatGPT https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a
-//Refernces
-// - ASP.NET Core Documentation: https://docs.microsoft.com/en-us/aspnet/core/?view=aspnetcore-6.0
-// - Entity Framework Core Documentation: https://docs.microsoft.com/en-us/ef/core/
-// - Bootstrap Documentation: https://getbootstrap.com/docs/5.1/getting-started/introduction/
-// - jQuery Documentation: https://api.jquery.com/
 // - ChatGPT https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a

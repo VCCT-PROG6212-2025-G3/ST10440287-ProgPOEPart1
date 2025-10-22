@@ -36,6 +36,40 @@
     .claim-returned {
         border-left-color: #17a2b8;
     }
+
+    .mini-progress {
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        background-color: #e9ecef;
+        margin-top: 10px;
+    }
+
+    .mini-progress-bar {
+        height: 100%;
+        transition: width 0.3s ease;
+    }
+
+    .live-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 5px;
+        animation: pulse-dot 2s infinite;
+    }
+
+    @@keyframes pulse-dot {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+
+        50% {
+            opacity: 0.5;
+            transform: scale(1.2);
+        }
+    }
 </style>
 
 <div class="row mb-4">
@@ -93,9 +127,29 @@
 }
 else
 {
+    <!-- Filter Buttons -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary active" onclick="filterClaims('all')">
+                    All Claims
+                </button>
+                <button type="button" class="btn btn-outline-warning" onclick="filterClaims('pending')">
+                    ⏳ Pending
+                </button>
+                <button type="button" class="btn btn-outline-success" onclick="filterClaims('approved')">
+                    ✅ Approved
+                </button>
+                <button type="button" class="btn btn-outline-danger" onclick="filterClaims('rejected')">
+                    ❌ Rejected
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Claims List -->
-    <div class="row">
-        @foreach (var claim in Model)
+    <div class="row" id="claimsContainer">
+        @foreach (var claim in Model.OrderByDescending(c => c.SubmissionDate))
         {
             var statusClass = claim.Status switch
             {
@@ -107,33 +161,27 @@ else
                 _ => ""
             };
 
-            var statusBadge = claim.Status switch
+            var dataStatus = claim.Status switch
             {
-                ProgPOE.Models.ClaimStatus.Pending => "bg-warning",
-                ProgPOE.Models.ClaimStatus.PendingManager => "bg-info",
-                ProgPOE.Models.ClaimStatus.Approved => "bg-success",
-                ProgPOE.Models.ClaimStatus.Rejected => "bg-danger",
-                ProgPOE.Models.ClaimStatus.Returned => "bg-secondary",
-                _ => "bg-dark"
+                ProgPOE.Models.ClaimStatus.Pending => "pending",
+                ProgPOE.Models.ClaimStatus.PendingManager => "pending",
+                ProgPOE.Models.ClaimStatus.Approved => "approved",
+                ProgPOE.Models.ClaimStatus.Rejected => "rejected",
+                ProgPOE.Models.ClaimStatus.Returned => "returned",
+                _ => ""
             };
 
-            var statusIcon = claim.Status switch
-            {
-                ProgPOE.Models.ClaimStatus.Pending => "⏳",
-                ProgPOE.Models.ClaimStatus.PendingManager => "🔄",
-                ProgPOE.Models.ClaimStatus.Approved => "✅",
-                ProgPOE.Models.ClaimStatus.Rejected => "❌",
-                ProgPOE.Models.ClaimStatus.Returned => "↩️",
-                _ => "📋"
-            };
-
-            <div class="col-md-6 col-lg-4">
+            <div class="col-md-6 col-lg-4 claim-item" data-status="@dataStatus">
                 <div class="card claim-card @statusClass">
                     <div class="card-header">
                         <h5 class="mb-0">
                             📅 @claim.MonthYear
-                            <span class="badge @statusBadge status-badge float-end">
-                                @statusIcon @claim.Status.ToString()
+                            <span class="badge bg-@claim.ProgressBarColor status-badge float-end">
+                                @if (claim.Status == ProgPOE.Models.ClaimStatus.Pending || claim.Status == ProgPOE.Models.ClaimStatus.PendingManager)
+                                {
+                                    <span class="live-indicator" style="background-color: white;"></span>
+                                }
+                                @claim.StatusIcon @claim.Status.ToString()
                             </span>
                         </h5>
                     </div>
@@ -155,9 +203,17 @@ else
                             <small>Submitted: @claim.SubmissionDate.ToString("dd MMM yyyy")</small>
                         </p>
 
+                        <!-- Mini Progress Bar -->
+                        <div class="mini-progress">
+                            <div class="mini-progress-bar bg-@claim.ProgressBarColor"
+                                 style="width: @claim.ProgressPercentage%">
+                            </div>
+                        </div>
+                        <small class="text-muted">@claim.StatusDisplayText (@claim.ProgressPercentage% Complete)</small>
+
                         @if (claim.Documents.Any())
                         {
-                            <p class="mb-2">
+                            <p class="mb-2 mt-2">
                                 <span class="badge bg-info">📎 @claim.Documents.Count document(s)</span>
                             </p>
                         }
@@ -166,7 +222,7 @@ else
                         {
                             <p class="mb-2">
                                 <strong>Notes:</strong><br>
-                                <small>@claim.LecturerNotes</small>
+                                <small>@(claim.LecturerNotes.Length > 100 ? claim.LecturerNotes.Substring(0, 100) + "..." : claim.LecturerNotes)</small>
                             </p>
                         }
 
@@ -174,27 +230,20 @@ else
                         {
                             <div class="alert alert-danger mt-2">
                                 <strong>Rejection Reason:</strong><br>
-                                <small>@claim.CoordinatorNotes</small>
+                                <small>@(claim.CoordinatorNotes.Length > 100 ? claim.CoordinatorNotes.Substring(0, 100) + "..." : claim.CoordinatorNotes)</small>
                             </div>
                         }
 
                         <div class="mt-3">
                             <a href="@Url.Action("ViewClaim", "Home", new { id = claim.ClaimId })"
-                               class="btn btn-sm btn-outline-primary">
-                                👁️ View Details
+                               class="btn btn-sm btn-primary w-100 mb-2">
+                                👁️ View Details & Track Status
                             </a>
 
                             @if (claim.Status == ProgPOE.Models.ClaimStatus.Approved)
                             {
-                                <button class="btn btn-sm btn-outline-success" onclick="downloadReceipt(@claim.ClaimId)">
-                                    💾 Receipt
-                                </button>
-                            }
-
-                            @if (claim.Status == ProgPOE.Models.ClaimStatus.Pending)
-                            {
-                                <button class="btn btn-sm btn-outline-info" onclick="trackClaim(@claim.ClaimId)">
-                                    📍 Track
+                                <button class="btn btn-sm btn-outline-success w-100" onclick="downloadReceipt(@claim.ClaimId)">
+                                    💾 Download Receipt
                                 </button>
                             }
                         </div>
@@ -214,12 +263,35 @@ else
     </a>
 </div>
 
-<script>
-    function downloadReceipt(claimId) {
-        alert('💾 Download Receipt\n\nDownloading receipt for Claim ID: CL-' + claimId.toString().padStart(6, '0') + '\n\n⚠️ Feature coming soon!');
-    }
+@section Scripts {
+    <script>
+        function filterClaims(status) {
+            const items = document.querySelectorAll('.claim-item');
+            const buttons = document.querySelectorAll('.btn-group .btn');
 
-    function trackClaim(claimId) {
-        alert('📍 Track Claim\n\nClaim ID: CL-' + claimId.toString().padStart(6, '0') + '\n\nStatus: Pending Coordinator Review\nEstimated Processing: 3-5 business days\n\n⚠️ Detailed tracking coming soon!');
-    }
-</script>
+            // Update button states
+            buttons.forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+
+            // Filter claims
+            items.forEach(item => {
+                if (status === 'all' || item.dataset.status === status) {
+                    item.style.display = 'block';
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        }
+
+        function downloadReceipt(claimId) {
+            alert('💾 Download Receipt\n\nDownloading receipt for Claim ID: CL-' + claimId.toString().padStart(6, '0') + '\n\n⚠️ Feature coming soon!');
+        }
+
+        // Auto-refresh pending claims every 60 seconds
+        const hasPendingClaims = document.querySelectorAll('[data-status="pending"]').length > 0;
+        if (hasPendingClaims) {
+            console.log('Auto-refresh enabled for pending claims');
+            // In production, use AJAX to check for updates without full page reload
+        }
+    </script>
+}

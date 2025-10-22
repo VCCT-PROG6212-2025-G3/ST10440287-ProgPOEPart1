@@ -1,0 +1,434 @@
+﻿@model ProgPOE.Models.Claim
+@{
+    ViewData["Title"] = "View Claim";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<style>
+    .status-timeline {
+        position: relative;
+        padding: 20px 0;
+    }
+
+    .timeline-item {
+        position: relative;
+        padding-left: 60px;
+        padding-bottom: 30px;
+    }
+
+        .timeline-item:last-child {
+            padding-bottom: 0;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: 20px;
+            top: 30px;
+            bottom: -10px;
+            width: 2px;
+            background: #dee2e6;
+        }
+
+        .timeline-item:last-child::before {
+            display: none;
+        }
+
+    .timeline-icon {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        background: white;
+        border: 3px solid #dee2e6;
+        z-index: 1;
+    }
+
+        .timeline-icon.completed {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+
+        .timeline-icon.active {
+            border-color: #007bff;
+            background: #cce5ff;
+            animation: pulse 2s infinite;
+        }
+
+    @@keyframes pulse {
+        0%, 100% {
+            box-shadow: 0 0 0 0 rgba(0, 123, 255, 0.7);
+        }
+
+        50% {
+            box-shadow: 0 0 0 10px rgba(0, 123, 255, 0);
+        }
+    }
+
+    .timeline-content {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .progress-section {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .status-badge-large {
+        font-size: 1.2rem;
+        padding: 10px 20px;
+        border-radius: 8px;
+    }
+
+    .claim-detail-card {
+        background: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 20px;
+    }
+
+    .document-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 15px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        transition: all 0.2s;
+    }
+
+        .document-item:hover {
+            background: #e9ecef;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+    .live-status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-right: 8px;
+        animation: blink 2s infinite;
+    }
+
+    @@keyframes blink {
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.3;
+        }
+    }
+</style>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h2>📋 Claim Details</h2>
+                <p class="text-muted mb-0">Claim ID: CL-@Model.ClaimId.ToString("D6")</p>
+            </div>
+            <div>
+                <a href="@Url.Action("MyClaims", "Home")" class="btn btn-outline-secondary">
+                    ← Back to My Claims
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left Column - Claim Details -->
+    <div class="col-md-8">
+        <!-- Status Progress Bar -->
+        <div class="progress-section">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">
+                    @if (Model.Status == ProgPOE.Models.ClaimStatus.Pending || Model.Status == ProgPOE.Models.ClaimStatus.PendingManager)
+                    {
+                        <span class="live-status-indicator" style="background-color: @Model.StatusColor;"></span>
+                    }
+                    <span>Claim Status</span>
+                </h5>
+                <span class="badge bg-@Model.ProgressBarColor status-badge-large">
+                    @Model.StatusIcon @Model.StatusDisplayText
+                </span>
+            </div>
+
+            <div class="progress" style="height: 30px;">
+                <div class="progress-bar bg-@Model.ProgressBarColor progress-bar-striped @(Model.Status == ProgPOE.Models.ClaimStatus.Pending || Model.Status == ProgPOE.Models.ClaimStatus.PendingManager ? "progress-bar-animated" : "")"
+                     role="progressbar"
+                     style="width: @Model.ProgressPercentage%"
+                     aria-valuenow="@Model.ProgressPercentage"
+                     aria-valuemin="0"
+                     aria-valuemax="100">
+                    @Model.ProgressPercentage%
+                </div>
+            </div>
+
+            @if (Model.Status == ProgPOE.Models.ClaimStatus.Pending)
+            {
+                <div class="alert alert-warning mt-3 mb-0">
+                    <strong>⏳ Next Step:</strong> Your claim is awaiting review by the Programme Coordinator.
+                    <br>
+                    <small>Expected processing time: 3-5 business days</small>
+                </div>
+            }
+            else if (Model.Status == ProgPOE.Models.ClaimStatus.PendingManager)
+            {
+                <div class="alert alert-info mt-3 mb-0">
+                    <strong>🔄 Next Step:</strong> Your claim has been approved by the coordinator and is now awaiting final approval from the Academic Manager.
+                    <br>
+                    <small>Expected processing time: 2-3 business days</small>
+                </div>
+            }
+            else if (Model.Status == ProgPOE.Models.ClaimStatus.Approved)
+            {
+                <div class="alert alert-success mt-3 mb-0">
+                    <strong>✅ Approved!</strong> Your claim has been approved and is ready for payment processing.
+                    <br>
+                    <small>Payment typically processes within 5-7 business days</small>
+                </div>
+            }
+            else if (Model.Status == ProgPOE.Models.ClaimStatus.Rejected)
+            {
+                <div class="alert alert-danger mt-3 mb-0">
+                    <strong>❌ Rejected:</strong> Your claim has been rejected. Please review the feedback below.
+                </div>
+            }
+            else if (Model.Status == ProgPOE.Models.ClaimStatus.Returned)
+            {
+                <div class="alert alert-secondary mt-3 mb-0">
+                    <strong>↩️ Returned:</strong> Your claim has been returned for revision. Please review the feedback and resubmit.
+                </div>
+            }
+        </div>
+
+        <!-- Claim Information -->
+        <div class="claim-detail-card">
+            <h5 class="mb-3">📄 Claim Information</h5>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted">Claim Period</label>
+                    <h6>📅 @Model.MonthYear</h6>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted">Submitted On</label>
+                    <h6>🗓️ @Model.SubmissionDate.ToString("dd MMM yyyy HH:mm")</h6>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted">Hours Worked</label>
+                    <h6>⏱️ @Model.HoursWorked hours</h6>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="text-muted">Hourly Rate</label>
+                    <h6>💵 R @Model.HourlyRate.ToString("N2")</h6>
+                </div>
+                <div class="col-md-12">
+                    <hr>
+                    <label class="text-muted">Total Amount</label>
+                    <h3 class="text-success">💰 R @Model.TotalAmount.ToString("N2")</h3>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(Model.LecturerNotes))
+            {
+                <hr>
+                <div>
+                    <label class="text-muted"><strong>Your Notes:</strong></label>
+                    <p class="mb-0">@Model.LecturerNotes</p>
+                </div>
+            }
+        </div>
+
+        <!-- Supporting Documents -->
+        <div class="claim-detail-card">
+            <h5 class="mb-3">📎 Supporting Documents</h5>
+
+            @if (Model.Documents.Any())
+            {
+                @foreach (var doc in Model.Documents)
+                {
+                    <div class="document-item">
+                        <div class="d-flex align-items-center">
+                            <span style="font-size: 24px; margin-right: 10px;">@doc.GetFileIcon()</span>
+                            <div>
+                                <div class="fw-bold">@doc.FileName</div>
+                                <small class="text-muted">
+                                    @doc.FileType • @doc.GetFileSizeFormatted() • Uploaded @doc.UploadDate.ToString("dd MMM yyyy")
+                                </small>
+                            </div>
+                        </div>
+                        <div>
+                            <a href="@Url.Action("DownloadDocument", "Home", new { id = doc.DocumentId })"
+                               class="btn btn-sm btn-outline-primary">
+                                💾 Download
+                            </a>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="alert alert-info text-center">
+                    <p class="mb-0">📭 No supporting documents uploaded</p>
+                </div>
+            }
+
+            @if (Model.Status == ProgPOE.Models.ClaimStatus.Pending || Model.Status == ProgPOE.Models.ClaimStatus.Returned)
+            {
+                <div class="mt-3 text-center">
+                    <a href="@Url.Action("UploadDocuments", "Home", new { id = Model.ClaimId })"
+                       class="btn btn-outline-primary">
+                        📤 Upload Additional Documents
+                    </a>
+                </div>
+            }
+        </div>
+
+        <!-- Approval Notes -->
+        @if (!string.IsNullOrEmpty(Model.CoordinatorNotes) || !string.IsNullOrEmpty(Model.ManagerNotes))
+        {
+            <div class="claim-detail-card">
+                <h5 class="mb-3">💬 Approval Feedback</h5>
+
+                @if (!string.IsNullOrEmpty(Model.CoordinatorNotes))
+                {
+                    <div class="mb-3">
+                        <label class="text-muted"><strong>Programme Coordinator:</strong></label>
+                        <div class="alert alert-light mb-0">
+                            <p class="mb-0">@Model.CoordinatorNotes</p>
+                            @if (Model.CoordinatorApprovalDate.HasValue)
+                            {
+                                <small class="text-muted">📅 @Model.CoordinatorApprovalDate.Value.ToString("dd MMM yyyy HH:mm")</small>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (!string.IsNullOrEmpty(Model.ManagerNotes))
+                {
+                    <div>
+                        <label class="text-muted"><strong>Academic Manager:</strong></label>
+                        <div class="alert alert-light mb-0">
+                            <p class="mb-0">@Model.ManagerNotes</p>
+                            @if (Model.ManagerApprovalDate.HasValue)
+                            {
+                                <small class="text-muted">📅 @Model.ManagerApprovalDate.Value.ToString("dd MMM yyyy HH:mm")</small>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Right Column - Status Timeline -->
+    <div class="col-md-4">
+        <div class="claim-detail-card sticky-top" style="top: 20px;">
+            <h5 class="mb-3">🕐 Status Timeline</h5>
+
+            <div class="status-timeline">
+                @foreach (var item in Model.StatusHistory)
+                {
+                    <div class="timeline-item">
+                        <div class="timeline-icon @(item.IsCompleted ? "completed" : "") @(item.IsCompleted == false && (item.Step == 2 && Model.Status == ProgPOE.Models.ClaimStatus.Pending || item.Step == 3 && Model.Status == ProgPOE.Models.ClaimStatus.PendingManager) ? "active" : "")">
+                            @item.Icon
+                        </div>
+                        <div class="timeline-content">
+                            <h6 class="mb-1">
+                                @item.Title
+                                @if (item.IsCompleted)
+                                {
+                                    <span class="badge bg-success float-end">✓</span>
+                                }
+                                else if (item.Step == 2 && Model.Status == ProgPOE.Models.ClaimStatus.Pending || item.Step == 3 && Model.Status == ProgPOE.Models.ClaimStatus.PendingManager)
+                                {
+                                    <span class="badge bg-primary float-end">In Progress</span>
+                                }
+                            </h6>
+                            <p class="mb-1 text-muted" style="font-size: 0.875rem;">
+                                @item.Description
+                            </p>
+                            @if (item.Date.HasValue)
+                            {
+                                <small class="text-muted">
+                                    📅 @item.Date.Value.ToString("dd MMM yyyy HH:mm")
+                                </small>
+                            }
+                            @if (!string.IsNullOrEmpty(item.Notes))
+                            {
+                                <div class="alert alert-light mt-2 mb-0" style="font-size: 0.875rem;">
+                                    <strong>Note:</strong> @item.Notes
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <hr>
+
+            <div class="text-center">
+                <button class="btn btn-primary btn-sm w-100 mb-2" onclick="refreshStatus()">
+                    🔄 Refresh Status
+                </button>
+                <a href="@Url.Action("MyClaims", "Home")" class="btn btn-outline-secondary btn-sm w-100">
+                    📋 View All Claims
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function refreshStatus() {
+            // Show loading
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Refreshing...';
+            button.disabled = true;
+
+            // Simulate refresh (reload page after 1 second)
+            setTimeout(function () {
+                location.reload();
+            }, 1000);
+        }
+
+        // Auto-refresh every 30 seconds if claim is pending
+        @if (Model.Status == ProgPOE.Models.ClaimStatus.Pending || Model.Status == ProgPOE.Models.ClaimStatus.PendingManager)
+        {
+            <text>
+                setInterval(function() {
+                    console.log('Auto-refreshing claim status...');
+                    // In a real application, you would use AJAX to check status without full page reload
+                    // For now, we'll just add a visual indicator
+                    const indicator = document.querySelector('.live-status-indicator');
+                    if (indicator) {
+                        indicator.style.animation = 'none';
+                        setTimeout(() => {
+                            indicator.style.animation = 'blink 2s infinite';
+                        }, 10);
+                    }
+                }, 30000); // 30 seconds
+            </text>
+        }
+    </script>
+}

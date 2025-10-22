@@ -68,9 +68,21 @@ namespace ProgPOE.Services
             try
             {
                 var user = await _context.Users.FindAsync(userId);
-                var claims = await _context.Claims
-                    .Where(c => c.LecturerId == userId)
-                    .ToListAsync();
+
+                // Get claims based on user role
+                List<Claim> claims;
+                if (user?.Role == UserRole.Lecturer)
+                {
+                    // Lecturers see only their own claims
+                    claims = await _context.Claims
+                        .Where(c => c.LecturerId == userId)
+                        .ToListAsync();
+                }
+                else
+                {
+                    // Coordinators and Managers see all claims
+                    claims = await _context.Claims.ToListAsync();
+                }
 
                 return new DashboardViewModel
                 {
@@ -141,34 +153,50 @@ namespace ProgPOE.Services
                             claim.Status = ClaimStatus.PendingManager;
                             claim.CoordinatorApprovalDate = DateTime.Now;
                             claim.CoordinatorNotes = comments;
+                            _logger.LogInformation($"Claim {claimId} approved by coordinator, moved to PendingManager");
                         }
                         else if (approver.Role == UserRole.AcademicManager)
                         {
                             claim.Status = ClaimStatus.Approved;
                             claim.ManagerApprovalDate = DateTime.Now;
                             claim.ManagerNotes = comments;
+                            _logger.LogInformation($"Claim {claimId} approved by manager, status set to Approved");
                         }
                         break;
 
                     case ApprovalAction.Reject:
                         claim.Status = ClaimStatus.Rejected;
                         if (approver.Role == UserRole.ProgrammeCoordinator)
+                        {
                             claim.CoordinatorNotes = comments;
+                            claim.CoordinatorApprovalDate = DateTime.Now;
+                        }
                         else
+                        {
                             claim.ManagerNotes = comments;
+                            claim.ManagerApprovalDate = DateTime.Now;
+                        }
+                        _logger.LogInformation($"Claim {claimId} rejected by {approver.Role}");
                         break;
 
                     case ApprovalAction.Return:
                         claim.Status = ClaimStatus.Returned;
                         if (approver.Role == UserRole.ProgrammeCoordinator)
+                        {
                             claim.CoordinatorNotes = comments;
+                            claim.CoordinatorApprovalDate = DateTime.Now;
+                        }
                         else
+                        {
                             claim.ManagerNotes = comments;
+                            claim.ManagerApprovalDate = DateTime.Now;
+                        }
+                        _logger.LogInformation($"Claim {claimId} returned by {approver.Role}");
                         break;
                 }
 
                 await _context.SaveChangesAsync();
-                _logger.LogInformation($"Claim {claimId} processed successfully");
+                _logger.LogInformation($"Claim {claimId} processed successfully by {approver.FullName}");
                 return true;
             }
             catch (Exception ex)

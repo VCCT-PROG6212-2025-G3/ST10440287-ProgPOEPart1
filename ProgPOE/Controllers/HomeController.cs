@@ -31,7 +31,47 @@ namespace ProgPOE.Controllers
         // GET: Home/Index
         public IActionResult Index()
         {
+            // Initialize session if not set
+            if (!HttpContext.Session.Keys.Contains("UserId"))
+            {
+                // Default to lecturer (John Smith)
+                HttpContext.Session.SetInt32("UserId", 1);
+                HttpContext.Session.SetString("UserRole", "Lecturer");
+                HttpContext.Session.SetString("UserName", "John Smith");
+            }
+
+            ViewBag.CurrentUser = GetCurrentUserInfo();
             return View();
+        }
+
+        // GET: Home/SwitchRole
+        public async Task<IActionResult> SwitchRole(int userId)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(userId);
+                if (user == null)
+                {
+                    TempData["Error"] = "User not found.";
+                    return RedirectToAction("Index");
+                }
+
+                // Set session variables
+                HttpContext.Session.SetInt32("UserId", user.UserId);
+                HttpContext.Session.SetString("UserRole", user.Role.ToString());
+                HttpContext.Session.SetString("UserName", user.FullName);
+
+                TempData["Success"] = $"Switched to {user.FullName} ({user.Role})";
+                _logger.LogInformation($"Role switched to {user.FullName} ({user.Role})");
+
+                return RedirectToAction("Dashboard");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error switching role");
+                TempData["Error"] = "Error switching role.";
+                return RedirectToAction("Index");
+            }
         }
 
         // GET: Home/Dashboard
@@ -39,10 +79,10 @@ namespace ProgPOE.Controllers
         {
             try
             {
-                // TODO: Get actual user ID from session/authentication
                 int userId = GetCurrentUserId();
 
                 var dashboardData = await _claimService.GetDashboardDataAsync(userId);
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(dashboardData);
             }
             catch (Exception ex)
@@ -58,12 +98,11 @@ namespace ProgPOE.Controllers
         {
             var model = new SubmitClaimViewModel
             {
-                // Pre-fill with current month
                 MonthYear = DateTime.Now.ToString("yyyy-MM"),
-                // Get user's default rate from session or database
                 HourlyRate = GetUserDefaultRate()
             };
 
+            ViewBag.CurrentUser = GetCurrentUserInfo();
             return View(model);
         }
 
@@ -77,13 +116,12 @@ namespace ProgPOE.Controllers
                 if (!ModelState.IsValid)
                 {
                     TempData["Error"] = "Please correct the errors in the form.";
+                    ViewBag.CurrentUser = GetCurrentUserInfo();
                     return View(model);
                 }
 
-                // Get current user ID
                 int userId = GetCurrentUserId();
 
-                // Create new claim
                 var claim = new Claim
                 {
                     LecturerId = userId,
@@ -95,11 +133,9 @@ namespace ProgPOE.Controllers
                     LecturerNotes = model.Notes
                 };
 
-                // Add claim to database
                 _context.Claims.Add(claim);
                 await _context.SaveChangesAsync();
 
-                // Handle file uploads if any
                 if (model.Documents != null && model.Documents.Any())
                 {
                     var uploadPath = Path.Combine(_environment.ContentRootPath, "uploads");
@@ -131,6 +167,7 @@ namespace ProgPOE.Controllers
             {
                 _logger.LogError(ex, "Error submitting claim");
                 TempData["Error"] = "An error occurred while submitting your claim. Please try again.";
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(model);
             }
         }
@@ -142,6 +179,7 @@ namespace ProgPOE.Controllers
             {
                 int userId = GetCurrentUserId();
                 var claims = await _claimService.GetUserClaimsAsync(userId);
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(claims);
             }
             catch (Exception ex)
@@ -165,14 +203,17 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("MyClaims");
                 }
 
-                // TODO: Add authorization check - ensure user can view this claim
+                // Authorization check
                 int userId = GetCurrentUserId();
-                if (claim.LecturerId != userId)
+                var userRole = GetCurrentUserRole();
+
+                if (claim.LecturerId != userId && userRole == UserRole.Lecturer)
                 {
                     TempData["Error"] = "You are not authorized to view this claim.";
                     return RedirectToAction("MyClaims");
                 }
 
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(claim);
             }
             catch (Exception ex)
@@ -188,7 +229,29 @@ namespace ProgPOE.Controllers
         {
             try
             {
+                var userRole = GetCurrentUserRole();
+
+                if (userRole == UserRole.Lecturer)
+                {
+                    TempData["Error"] = "You don't have permission to approve claims.";
+                    return RedirectToAction("Dashboard");
+                }
+
                 var pendingClaims = await _claimService.GetPendingClaimsAsync();
+
+                // Filter claims based on role
+                if (userRole == UserRole.ProgrammeCoordinator)
+                {
+                    // Coordinators see only Pending claims
+                    pendingClaims = pendingClaims.Where(c => c.Status == ClaimStatus.Pending).ToList();
+                }
+                else if (userRole == UserRole.AcademicManager)
+                {
+                    // Managers see only PendingManager claims
+                    pendingClaims = pendingClaims.Where(c => c.Status == ClaimStatus.PendingManager).ToList();
+                }
+
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(pendingClaims);
             }
             catch (Exception ex)
@@ -207,12 +270,20 @@ namespace ProgPOE.Controllers
             try
             {
                 int approverId = GetCurrentUserId();
+                var userRole = GetCurrentUserRole();
+
+                if (userRole == UserRole.Lecturer)
+                {
+                    TempData["Error"] = "You don't have permission to approve claims.";
+                    return RedirectToAction("Dashboard");
+                }
 
                 var result = await _claimService.ProcessApprovalAsync(claimId, action, comments, approverId);
 
                 if (result)
                 {
-                    TempData["Success"] = $"Claim {action.ToString().ToLower()}d successfully!";
+                    TempData["Success"] = $"Claim {action.ToString().ToLower()}ed successfully!";
+                    _logger.LogInformation($"Claim {claimId} {action.ToString().ToLower()}ed by {approverId}");
                 }
                 else
                 {
@@ -259,7 +330,6 @@ namespace ProgPOE.Controllers
         {
             try
             {
-                // TODO: Add authorization - only allow deletion by claim owner and if claim is pending
                 var claim = await _claimService.GetClaimByIdAsync(claimId);
 
                 if (claim == null || claim.Status != ClaimStatus.Pending)
@@ -302,7 +372,6 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("MyClaims");
                 }
 
-                // Only allow upload for pending claims
                 if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.Returned)
                 {
                     TempData["Error"] = "Cannot upload documents to this claim.";
@@ -315,6 +384,7 @@ namespace ProgPOE.Controllers
                 };
 
                 ViewBag.Claim = claim;
+                ViewBag.CurrentUser = GetCurrentUserInfo();
                 return View(model);
             }
             catch (Exception ex)
@@ -365,12 +435,35 @@ namespace ProgPOE.Controllers
         }
 
         // Helper method to get current user ID
-        // TODO: Replace with actual authentication
         private int GetCurrentUserId()
         {
-            // Temporarily return user 1 (John Smith - Lecturer)
-            // In production, get from HttpContext.Session or User.Identity
             return HttpContext.Session.GetInt32("UserId") ?? 1;
+        }
+
+        // Helper method to get current user role
+        private UserRole GetCurrentUserRole()
+        {
+            var roleString = HttpContext.Session.GetString("UserRole");
+            if (string.IsNullOrEmpty(roleString))
+            {
+                return UserRole.Lecturer;
+            }
+            return Enum.Parse<UserRole>(roleString);
+        }
+
+        // Helper method to get current user info
+        private object GetCurrentUserInfo()
+        {
+            var userId = HttpContext.Session.GetInt32("UserId") ?? 1;
+            var userName = HttpContext.Session.GetString("UserName") ?? "John Smith";
+            var userRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
+
+            return new
+            {
+                UserId = userId,
+                UserName = userName,
+                UserRole = userRole
+            };
         }
 
         // Helper method to get user's default hourly rate
@@ -384,7 +477,7 @@ namespace ProgPOE.Controllers
             }
             catch
             {
-                return 450.00m; // Default fallback
+                return 450.00m;
             }
         }
 
