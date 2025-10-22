@@ -181,3 +181,10 @@ namespace ProgPOE
 // - jQuery Documentation: https://api.jquery.com/
 // - File Upload Security: https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload
 // - ChatGPT: https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a
+// Part 2
+// - Database: https://learn.microsoft.com/en-us/troubleshoot/developer/visualstudio/csharp/language-compilers/create-sql-server-database-programmatically
+// - Logging: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/logging/?view=aspnetcore-6.0
+// - Dependency Injection: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/dependency-injection/?view=aspnetcore-6.0
+// - Session Management: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/app-state?view=aspnetcore-6.0
+// - Environment Management: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/environments?view=aspnetcore-6.0
+// - ChatGPT: https://chatgpt.com/share/68f8c478-59c0-8001-8fba-a9574663b979
