@@ -1,454 +1,449 @@
-﻿@* Views/Home/SubmitClaim.cshtml - Submit Claim View *@
-@model ProgPOE.Models.SubmitClaimViewModel
+﻿@model ProgPOE.Models.SubmitClaimViewModel
 @{
     ViewData["Title"] = "Submit Claim";
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
 <style>
-    .claim-form-container {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 30px;
-        border-radius: 15px;
-        margin-bottom: 30px;
-        color: white;
-    }
-
-    .form-card {
-        border: none;
-        border-radius: 12px;
-        box-shadow: 0 5px 20px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-
-    .total-amount-display {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #28a745;
-        padding: 20px;
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-        border-radius: 10px;
-        text-align: center;
-        margin: 10px 0;
-        border: 3px solid #28a745;
-    }
-
-    .submit-btn {
-        font-size: 1.2rem;
-        padding: 15px 40px;
-        border-radius: 50px;
-        font-weight: bold;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(40, 167, 69, 0.4);
-    }
-
-        .submit-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 6px 20px rgba(40, 167, 69, 0.6);
-        }
-
-    .file-upload-zone {
-        border: 3px dashed #007bff;
-        border-radius: 10px;
+    .upload-area {
+        border: 2px dashed #007bff;
+        border-radius: 8px;
         padding: 30px;
         text-align: center;
         background-color: #f8f9fa;
-        transition: all 0.3s ease;
+        transition: all 0.3s;
         cursor: pointer;
     }
 
-        .file-upload-zone:hover {
-            background-color: #e9ecef;
+        .upload-area:hover {
             border-color: #0056b3;
+            background-color: #e9ecef;
         }
 
+        .upload-area.dragover {
+            border-color: #28a745;
+            background-color: #d4edda;
+        }
+
+    .file-list {
+        margin-top: 20px;
+    }
+
     .file-item {
-        background: white;
-        border-left: 4px solid #007bff;
-        padding: 15px;
-        margin: 10px 0;
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         display: flex;
-        justify-content: space-between;
         align-items: center;
+        justify-content: space-between;
+        padding: 10px 15px;
+        background-color: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        margin-bottom: 10px;
+    }
+
+    .file-item-info {
+        display: flex;
+        align-items: center;
+        flex: 1;
+    }
+
+    .file-icon {
+        font-size: 24px;
+        margin-right: 10px;
+    }
+
+    .file-name {
+        font-weight: 500;
+        margin-right: 10px;
+    }
+
+    .file-size {
+        color: #6c757d;
+        font-size: 0.875rem;
     }
 
     .remove-file-btn {
-        background: #dc3545;
-        color: white;
-        border: none;
-        padding: 5px 15px;
-        border-radius: 20px;
-        cursor: pointer;
+        padding: 2px 8px;
+        font-size: 0.875rem;
     }
 
-    .info-box {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+    .calculation-box {
+        background-color: #e7f3ff;
+        border-left: 4px solid #007bff;
         padding: 20px;
-        border-radius: 12px;
+        margin-top: 20px;
+    }
+
+    .form-section {
+        background-color: white;
+        padding: 25px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         margin-bottom: 20px;
     }
 </style>
 
-<div class="container-fluid">
-    <!-- Header Section -->
-    <div class="claim-form-container">
-        <div class="text-center">
-            <h1 class="display-4">📝 Submit Monthly Claim</h1>
-            <p class="lead">Quick and easy claim submission process</p>
-        </div>
+<div class="row mb-4">
+    <div class="col-md-12">
+        <h2>📝 Submit New Claim</h2>
+        <p class="text-muted">Complete the form below to submit your monthly claim</p>
     </div>
-
-    @if (TempData["ErrorMessage"] != null)
-    {
-        <div class="alert alert-danger alert-dismissible fade show">
-            @TempData["ErrorMessage"]
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    }
-
-    <form asp-action="SubmitClaim" asp-controller="Home" method="post" enctype="multipart/form-data" id="claimForm">
-        @Html.AntiForgeryToken()
-
-        <div class="row">
-            <!-- Main Form Column -->
-            <div class="col-lg-8">
-                <!-- Claim Information Card -->
-                <div class="card form-card mb-4">
-                    <div class="card-header bg-primary text-white">
-                        <h5 class="mb-0">📋 Claim Information</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row mb-4">
-                            <!-- Claim Period -->
-                            <div class="col-md-6">
-                                <label asp-for="MonthYear" class="form-label fw-bold">
-                                    📅 Claim Period (YYYY-MM): <span class="text-danger">*</span>
-                                </label>
-                                <input asp-for="MonthYear" class="form-control form-control-lg" type="month" required />
-                                <span asp-validation-for="MonthYear" class="text-danger"></span>
-                            </div>
-
-                            <!-- Department (Read-only) -->
-                            <div class="col-md-6">
-                                <label class="form-label fw-bold">🏢 Department:</label>
-                                <input type="text" class="form-control form-control-lg" value="Computer Science" disabled />
-                                <small class="text-muted">Based on your user profile</small>
-                            </div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <!-- Hours and Rate -->
-                        <div class="row mb-4">
-                            <!-- Hours Worked -->
-                            <div class="col-md-4">
-                                <label asp-for="HoursWorked" class="form-label fw-bold">
-                                    ⏰ Hours Worked: <span class="text-danger">*</span>
-                                </label>
-                                <input asp-for="HoursWorked" class="form-control form-control-lg" type="number"
-                                       step="0.5" min="0.1" max="744" placeholder="0.0" required
-                                       onchange="calculateTotal()" oninput="calculateTotal()" />
-                                <span asp-validation-for="HoursWorked" class="text-danger"></span>
-                            </div>
-
-                            <!-- Hourly Rate -->
-                            <div class="col-md-4">
-                                <label asp-for="HourlyRate" class="form-label fw-bold">
-                                    💰 Hourly Rate (R): <span class="text-danger">*</span>
-                                </label>
-                                <input asp-for="HourlyRate" class="form-control form-control-lg" type="number"
-                                       step="0.01" min="1" max="9999.99" placeholder="450.00" required
-                                       onchange="calculateTotal()" oninput="calculateTotal()" />
-                                <span asp-validation-for="HourlyRate" class="text-danger"></span>
-                            </div>
-
-                            <!-- Total Amount (Calculated) -->
-                            <div class="col-md-4">
-                                <label class="form-label fw-bold">💵 Total Amount:</label>
-                                <div class="total-amount-display" id="totalAmount">
-                                    R 0.00
-                                </div>
-                            </div>
-                        </div>
-
-                        <hr class="my-4">
-
-                        <!-- Additional Notes -->
-                        <div class="mb-3">
-                            <label asp-for="Notes" class="form-label fw-bold">
-                                📝 Additional Notes (Optional):
-                            </label>
-                            <textarea asp-for="Notes" class="form-control" rows="4"
-                                      placeholder="Any additional information about your claim..."></textarea>
-                            <span asp-validation-for="Notes" class="text-danger"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Document Upload Card -->
-                <div class="card form-card mb-4">
-                    <div class="card-header bg-info text-white">
-                        <h5 class="mb-0">📎 Supporting Documents</h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- File Upload Zone -->
-                        <div class="file-upload-zone" id="fileUploadZone" onclick="document.getElementById('fileInput').click()">
-                            <div class="mb-3">
-                                <h5 class="mt-3">📤 Click to Upload or Drag & Drop Files</h5>
-                                <p class="text-muted mb-2">Upload your supporting documents here</p>
-                                <small class="text-muted">
-                                    <strong>Accepted:</strong> PDF, DOC, DOCX, JPG, PNG | <strong>Max size:</strong> 10MB per file
-                                </small>
-                            </div>
-                        </div>
-
-                        <input type="file" id="fileInput" name="documents" class="d-none" multiple
-                               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="handleFileSelect(this)" />
-
-                        <!-- File Preview List -->
-                        <div id="filePreview" class="mt-4" style="display: none;">
-                            <h6 class="fw-bold">📁 Selected Files:</h6>
-                            <div id="fileList"></div>
-                        </div>
-
-                        <!-- Required Documents Info -->
-                        <div class="alert alert-warning mt-4">
-                            <h6 class="alert-heading">⚠️ Required Documents:</h6>
-                            <ul class="mb-0">
-                                <li>✅ Monthly timesheet (signed)</li>
-                                <li>✅ Class attendance register</li>
-                                <li>✅ Course schedule/timetable</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Action Buttons Card -->
-                <div class="card form-card mb-4">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-12 text-center">
-                                <button type="submit" class="btn btn-success submit-btn me-3" id="submitBtn">
-                                    ✅ Submit Claim
-                                </button>
-                                <button type="button" class="btn btn-secondary btn-lg me-3" onclick="saveDraft()">
-                                    💾 Save as Draft
-                                </button>
-                                <a href="@Url.Action("Dashboard", "Home")" class="btn btn-outline-danger btn-lg">
-                                    ❌ Cancel
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Sidebar Column -->
-            <div class="col-lg-4">
-                <!-- Guidelines Card -->
-                <div class="card form-card mb-4">
-                    <div class="card-header bg-success text-white">
-                        <h5 class="mb-0">ℹ️ Submission Guidelines</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="info-box">
-                            <h6>📋 Required Information:</h6>
-                            <ul class="mb-0">
-                                <li>✓ Accurate hours worked</li>
-                                <li>✓ Correct hourly rate</li>
-                                <li>✓ Valid claim period</li>
-                                <li>✓ Supporting documents</li>
-                            </ul>
-                        </div>
-
-                        <div class="info-box">
-                            <h6>⏰ Processing Timeline:</h6>
-                            <ul class="mb-0">
-                                <li><strong>Step 1:</strong> Coordinator Review (3-5 days)</li>
-                                <li><strong>Step 2:</strong> Manager Approval (2-3 days)</li>
-                                <li><strong>Step 3:</strong> Payment Processing (5-7 days)</li>
-                            </ul>
-                        </div>
-
-                        <div class="alert alert-success mb-0">
-                            <h6 class="alert-heading">💡 Pro Tip:</h6>
-                            <p class="mb-0">Submit claims by the <strong>5th of each month</strong> for faster processing!</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </form>
 </div>
 
+<form asp-action="SubmitClaim" asp-controller="Home" method="post" enctype="multipart/form-data" id="claimForm">
+    <div class="row">
+        <div class="col-md-8">
+            <!-- Claim Details Section -->
+            <div class="form-section">
+                <h5 class="mb-3">📋 Claim Details</h5>
+
+                <div class="mb-3">
+                    <label asp-for="MonthYear" class="form-label"></label>
+                    <input asp-for="MonthYear" type="month" class="form-control" id="monthYear" required />
+                    <span asp-validation-for="MonthYear" class="text-danger"></span>
+                    <small class="form-text text-muted">Select the month and year for this claim</small>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="HoursWorked" class="form-label"></label>
+                    <input asp-for="HoursWorked" type="number" step="0.5" class="form-control"
+                           id="hoursWorked" min="0.1" max="744" required />
+                    <span asp-validation-for="HoursWorked" class="text-danger"></span>
+                    <small class="form-text text-muted">Enter total hours worked (0.1 - 744)</small>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="HourlyRate" class="form-label"></label>
+                    <div class="input-group">
+                        <span class="input-group-text">R</span>
+                        <input asp-for="HourlyRate" type="number" step="0.01" class="form-control"
+                               id="hourlyRate" min="1" max="9999.99" required />
+                    </div>
+                    <span asp-validation-for="HourlyRate" class="text-danger"></span>
+                    <small class="form-text text-muted">Your hourly rate in Rands</small>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Notes" class="form-label"></label>
+                    <textarea asp-for="Notes" class="form-control" rows="4" maxlength="500"></textarea>
+                    <span asp-validation-for="Notes" class="text-danger"></span>
+                    <small class="form-text text-muted">Optional: Add any additional notes or details</small>
+                </div>
+            </div>
+
+            <!-- Document Upload Section -->
+            <div class="form-section">
+                <h5 class="mb-3">📎 Supporting Documents</h5>
+                <p class="text-muted mb-3">
+                    Upload supporting documents such as timesheets, attendance records, or other relevant files.
+                    <br>
+                    <strong>Allowed formats:</strong> PDF, DOC, DOCX, XLSX, XLS, JPG, JPEG, PNG
+                    <br>
+                    <strong>Maximum file size:</strong> 5 MB per file
+                </p>
+
+                <!-- Upload Area -->
+                <div class="upload-area" id="uploadArea">
+                    <div class="mb-3">
+                        <span style="font-size: 48px;">📁</span>
+                    </div>
+                    <h5>Drop files here or click to browse</h5>
+                    <p class="text-muted mb-0">Select one or multiple files</p>
+                    <input type="file"
+                           name="Documents"
+                           id="fileInput"
+                           class="d-none"
+                           multiple
+                           accept=".pdf,.doc,.docx,.xlsx,.xls,.jpg,.jpeg,.png" />
+                </div>
+
+                <!-- File List -->
+                <div class="file-list" id="fileList"></div>
+
+                <!-- Upload Button -->
+                <div class="mt-3 text-center">
+                    <button type="button" class="btn btn-outline-primary" onclick="document.getElementById('fileInput').click()">
+                        📤 Browse Files
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Sidebar -->
+        <div class="col-md-4">
+            <div class="form-section sticky-top" style="top: 20px;">
+                <h5 class="mb-3">💰 Claim Summary</h5>
+
+                <div class="calculation-box">
+                    <div class="mb-3">
+                        <label class="text-muted">Hours Worked:</label>
+                        <h4 id="displayHours">0.0</h4>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-muted">Hourly Rate:</label>
+                        <h4 id="displayRate">R 0.00</h4>
+                    </div>
+                    <hr>
+                    <div>
+                        <label class="text-muted">Total Amount:</label>
+                        <h3 class="text-success" id="displayTotal">R 0.00</h3>
+                    </div>
+                </div>
+
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Documents:</span>
+                        <span class="badge bg-info" id="documentCount">0</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted">Status:</span>
+                        <span class="badge bg-warning">Draft</span>
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">
+                        ✅ Submit Claim
+                    </button>
+                    <a href="@Url.Action("Dashboard", "Home")" class="btn btn-outline-secondary">
+                        ❌ Cancel
+                    </a>
+                </div>
+
+                <div class="alert alert-info mt-3" role="alert">
+                    <small>
+                        <strong>📌 Note:</strong> Once submitted, your claim will be reviewed by the Programme Coordinator.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
 @section Scripts {
-    @{
-        await Html.RenderPartialAsync("_ValidationScriptsPartial");
-    }
-
     <script>
-        // Calculate total amount
-        function calculateTotal() {
-            const hours = parseFloat(document.querySelector('[name="HoursWorked"]').value) || 0;
-            const rate = parseFloat(document.querySelector('[name="HourlyRate"]').value) || 0;
-            const total = hours * rate;
+        // File handling variables
+        let selectedFiles = [];
+        const maxFileSize = 5 * 1024 * 1024; // 5MB
+        const allowedExtensions = ['.pdf', '.doc', '.docx', '.xlsx', '.xls', '.jpg', '.jpeg', '.png'];
 
-            document.getElementById('totalAmount').textContent = 'R ' + total.toLocaleString('en-ZA', {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function () {
+            updateCalculation();
+            setupFileUpload();
+            setupDragAndDrop();
+        });
+
+        // Setup file upload
+        function setupFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const uploadArea = document.getElementById('uploadArea');
+
+            uploadArea.addEventListener('click', function () {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', function (e) {
+                handleFiles(e.target.files);
             });
         }
 
-        // Handle file selection
-        function handleFileSelect(input) {
-            const files = Array.from(input.files);
-            const filePreview = document.getElementById('filePreview');
-            const fileList = document.getElementById('fileList');
+        // Setup drag and drop
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
 
-            if (files.length > 0) {
-                filePreview.style.display = 'block';
-                fileList.innerHTML = '';
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
 
-                files.forEach((file, index) => {
-                    const fileSize = (file.size / 1024).toFixed(1) + ' KB';
-                    const fileIcon = getFileIcon(file.name);
-
-                    const fileItem = document.createElement('div');
-                    fileItem.className = 'file-item';
-                    fileItem.innerHTML = `
-                        <div>
-                            <span style="font-size: 1.5rem;">${fileIcon}</span>
-                            <strong>${file.name}</strong>
-                            <br>
-                            <small class="text-muted">${fileSize}</small>
-                        </div>
-                        <button type="button" class="remove-file-btn" onclick="removeFile(${index})">
-                            ✖ Remove
-                        </button>
-                    `;
-                    fileList.appendChild(fileItem);
-                });
-            } else {
-                filePreview.style.display = 'none';
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
             }
-        }
 
-        // Remove file from selection
-        function removeFile(index) {
-            const dt = new DataTransfer();
-            const input = document.getElementById('fileInput');
-            const files = Array.from(input.files);
-
-            files.forEach((file, i) => {
-                if (i !== index) {
-                    dt.items.add(file);
-                }
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, function () {
+                    uploadArea.classList.add('dragover');
+                }, false);
             });
 
-            input.files = dt.files;
-            handleFileSelect(input);
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, function () {
+                    uploadArea.classList.remove('dragover');
+                }, false);
+            });
+
+            uploadArea.addEventListener('drop', function (e) {
+                const dt = e.dataTransfer;
+                const files = dt.files;
+                handleFiles(files);
+            }, false);
         }
 
-        // Get file icon based on extension
-        function getFileIcon(filename) {
-            const extension = filename.split('.').pop().toLowerCase();
+        // Handle selected files
+        function handleFiles(files) {
+            for (let file of files) {
+                if (validateFile(file)) {
+                    selectedFiles.push(file);
+                }
+            }
+            displayFiles();
+            updateDocumentCount();
+        }
+
+        // Validate file
+        function validateFile(file) {
+            const fileName = file.name.toLowerCase();
+            const fileExtension = fileName.substring(fileName.lastIndexOf('.'));
+
+            // Check file extension
+            if (!allowedExtensions.includes(fileExtension)) {
+                alert('File type not allowed: ' + file.name + '\nAllowed types: ' + allowedExtensions.join(', '));
+                return false;
+            }
+
+            // Check file size
+            if (file.size > maxFileSize) {
+                alert('File too large: ' + file.name + '\nMaximum size: 5 MB');
+                return false;
+            }
+
+            // Check for duplicates
+            if (selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                alert('File already added: ' + file.name);
+                return false;
+            }
+
+            return true;
+        }
+
+        // Display files
+        function displayFiles() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '';
+
+            selectedFiles.forEach((file, index) => {
+                const fileItem = createFileItem(file, index);
+                fileList.appendChild(fileItem);
+            });
+
+            // Update actual file input
+            updateFileInput();
+        }
+
+        // Create file item element
+        function createFileItem(file, index) {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+
+            const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+            const icon = getFileIcon(fileExtension);
+
+            div.innerHTML = '<div class="file-item-info">' +
+                '<span class="file-icon">' + icon + '</span>' +
+                '<div>' +
+                '<div class="file-name">' + file.name + '</div>' +
+                '<div class="file-size">' + formatFileSize(file.size) + '</div>' +
+                '</div>' +
+                '</div>' +
+                '<button type="button" class="btn btn-sm btn-outline-danger remove-file-btn" onclick="removeFile(' + index + ')">' +
+                '❌ Remove' +
+                '</button>';
+
+            return div;
+        }
+
+        // Get file icon
+        function getFileIcon(extension) {
             const icons = {
-                'pdf': '📕',
-                'doc': '📘',
-                'docx': '📘',
-                'jpg': '🖼️',
-                'jpeg': '🖼️',
-                'png': '🖼️'
+                '.pdf': '📕',
+                '.doc': '📘',
+                '.docx': '📘',
+                '.xlsx': '📗',
+                '.xls': '📗',
+                '.jpg': '🖼️',
+                '.jpeg': '🖼️',
+                '.png': '🖼️'
             };
             return icons[extension] || '📄';
         }
 
-        // Save as draft
-        function saveDraft() {
-            const hours = document.querySelector('[name="HoursWorked"]').value;
-            const rate = document.querySelector('[name="HourlyRate"]').value;
-            const period = document.querySelector('[name="MonthYear"]').value;
-
-            if (!period || !hours || !rate) {
-                alert('⚠️ Please fill in at least the claim period, hours, and rate before saving a draft.');
-                return;
-            }
-
-            localStorage.setItem('claimDraft', JSON.stringify({
-                period: period,
-                hours: hours,
-                rate: rate,
-                notes: document.querySelector('[name="Notes"]').value,
-                savedAt: new Date().toISOString()
-            }));
-
-            alert('💾 Draft Saved Successfully!\n\nYou can complete it later from the dashboard.');
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
         }
 
-        // Drag and drop functionality
-        const uploadZone = document.getElementById('fileUploadZone');
-        const fileInput = document.getElementById('fileInput');
+        // Remove file
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            displayFiles();
+            updateDocumentCount();
+        }
 
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, (e) => {
+        // Update file input with DataTransfer
+        function updateFileInput() {
+            const fileInput = document.getElementById('fileInput');
+            const dataTransfer = new DataTransfer();
+
+            selectedFiles.forEach(file => {
+                dataTransfer.items.add(file);
+            });
+
+            fileInput.files = dataTransfer.files;
+        }
+
+        // Update document count
+        function updateDocumentCount() {
+            document.getElementById('documentCount').textContent = selectedFiles.length;
+        }
+
+        // Real-time calculation
+        document.getElementById('hoursWorked').addEventListener('input', updateCalculation);
+        document.getElementById('hourlyRate').addEventListener('input', updateCalculation);
+
+        function updateCalculation() {
+            const hours = parseFloat(document.getElementById('hoursWorked').value) || 0;
+            const rate = parseFloat(document.getElementById('hourlyRate').value) || 0;
+            const total = hours * rate;
+
+            document.getElementById('displayHours').textContent = hours.toFixed(1);
+            document.getElementById('displayRate').textContent = 'R ' + rate.toFixed(2);
+            document.getElementById('displayTotal').textContent = 'R ' + total.toFixed(2);
+        }
+
+        // Form submission validation
+        document.getElementById('claimForm').addEventListener('submit', function (e) {
+            const hours = parseFloat(document.getElementById('hoursWorked').value);
+            const rate = parseFloat(document.getElementById('hourlyRate').value);
+
+            if (hours < 0.1 || hours > 744) {
                 e.preventDefault();
-                e.stopPropagation();
-            });
-        });
+                alert('⚠️ Hours worked must be between 0.1 and 744');
+                return false;
+            }
 
-        ['dragenter', 'dragover'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => {
-                uploadZone.style.backgroundColor = '#d1ecf1';
-                uploadZone.style.borderColor = '#17a2b8';
-            });
-        });
+            if (rate < 1 || rate > 9999.99) {
+                e.preventDefault();
+                alert('⚠️ Hourly rate must be between R1.00 and R9999.99');
+                return false;
+            }
 
-        ['dragleave', 'drop'].forEach(eventName => {
-            uploadZone.addEventListener(eventName, () => {
-                uploadZone.style.backgroundColor = '#f8f9fa';
-                uploadZone.style.borderColor = '#007bff';
-            });
-        });
-
-        uploadZone.addEventListener('drop', (e) => {
-            const dt = e.dataTransfer;
-            fileInput.files = dt.files;
-            handleFileSelect(fileInput);
-        });
-
-        // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            calculateTotal();
-
-            // Load draft if exists
-            const draft = localStorage.getItem('claimDraft');
-            if (draft) {
-                const draftData = JSON.parse(draft);
-                const loadDraft = confirm('📋 Draft Found! Would you like to load it?');
-
-                if (loadDraft) {
-                    document.querySelector('[name="MonthYear"]').value = draftData.period;
-                    document.querySelector('[name="HoursWorked"]').value = draftData.hours;
-                    document.querySelector('[name="HourlyRate"]').value = draftData.rate;
-                    document.querySelector('[name="Notes"]').value = draftData.notes || '';
-                    calculateTotal();
-                    localStorage.removeItem('claimDraft');
+            if (selectedFiles.length === 0) {
+                const confirmSubmit = confirm('⚠️ No documents uploaded. Do you want to submit without supporting documents?');
+                if (!confirmSubmit) {
+                    e.preventDefault();
+                    return false;
                 }
             }
-        });
 
-        // Form submission handling
-        document.getElementById('claimForm').addEventListener('submit', function(e) {
-            const submitBtn = document.getElementById('submitBtn');
-
-            // Show loading state
-            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Submitting...';
-            submitBtn.disabled = true;
-
-            // The form will submit normally - the button state is just for UX
+            return true;
         });
     </script>
+
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
 }

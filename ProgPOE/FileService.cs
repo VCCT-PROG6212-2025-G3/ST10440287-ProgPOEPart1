@@ -6,115 +6,262 @@ namespace ProgPOE.Services
 {
     public interface IFileService
     {
-        Task<bool> UploadDocumentsAsync(int claimId, List<IFormFile> files);
-        Task<byte[]> GetDocumentAsync(int documentId);
-        bool ValidateFile(IFormFile file);
+        Task<(bool Success, string Message, List<SupportingDocument> Documents)> UploadFilesAsync(
+            int claimId,
+            List<IFormFile> files,
+            string uploadPath);
+
+        Task<bool> DeleteFileAsync(int documentId);
+        Task<(bool Success, byte[] FileData, string ContentType, string FileName)> DownloadFileAsync(int documentId);
+        bool ValidateFile(IFormFile file, out string errorMessage);
         Task<List<SupportingDocument>> GetClaimDocumentsAsync(int claimId);
     }
 
     public class FileService : IFileService
     {
         private readonly ApplicationDbContext _context;
-        private readonly IWebHostEnvironment _environment;
         private readonly ILogger<FileService> _logger;
-        private readonly string[] _allowedExtensions = { ".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png" };
-        private const long _maxFileSize = 10 * 1024 * 1024; // 10MB
+        private readonly IWebHostEnvironment _environment;
 
-        public FileService(ApplicationDbContext context, IWebHostEnvironment environment, ILogger<FileService> logger)
+        // File upload configuration
+        private readonly long _maxFileSize = 5 * 1024 * 1024; // 5MB
+        private readonly string[] _allowedExtensions = { ".pdf", ".doc", ".docx", ".xlsx", ".xls", ".jpg", ".jpeg", ".png" };
+        private readonly Dictionary<string, string> _mimeTypes = new()
+        {
+            { ".pdf", "application/pdf" },
+            { ".doc", "application/msword" },
+            { ".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
+            { ".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+            { ".xls", "application/vnd.ms-excel" },
+            { ".jpg", "image/jpeg" },
+            { ".jpeg", "image/jpeg" },
+            { ".png", "image/png" }
+        };
+
+        public FileService(
+            ApplicationDbContext context,
+            ILogger<FileService> logger,
+            IWebHostEnvironment environment)
         {
             _context = context;
-            _environment = environment;
             _logger = logger;
+            _environment = environment;
         }
 
-        public async Task<bool> UploadDocumentsAsync(int claimId, List<IFormFile> files)
+        public bool ValidateFile(IFormFile file, out string errorMessage)
         {
+            errorMessage = string.Empty;
+
+            if (file == null || file.Length == 0)
+            {
+                errorMessage = "File is empty or not provided.";
+                return false;
+            }
+
+            // Check file size
+            if (file.Length > _maxFileSize)
+            {
+                errorMessage = $"File size exceeds the maximum limit of {_maxFileSize / (1024 * 1024)}MB.";
+                return false;
+            }
+
+            // Check file extension
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (!_allowedExtensions.Contains(extension))
+            {
+                errorMessage = $"File type '{extension}' is not allowed. Allowed types: {string.Join(", ", _allowedExtensions)}";
+                return false;
+            }
+
+            // Check for potentially dangerous filenames
+            if (file.FileName.Contains("..") || file.FileName.Contains("/") || file.FileName.Contains("\\"))
+            {
+                errorMessage = "Invalid filename detected.";
+                return false;
+            }
+
+            return true;
+        }
+
+        public async Task<(bool Success, string Message, List<SupportingDocument> Documents)> UploadFilesAsync(
+            int claimId,
+            List<IFormFile> files,
+            string uploadPath)
+        {
+            var uploadedDocuments = new List<SupportingDocument>();
+            var errorMessages = new List<string>();
+
             try
             {
-                var uploadPath = Path.Combine(_environment.WebRootPath, "uploads", claimId.ToString());
-                if (!Directory.Exists(uploadPath))
+                // Verify claim exists
+                var claim = await _context.Claims.FindAsync(claimId);
+                if (claim == null)
                 {
-                    Directory.CreateDirectory(uploadPath);
+                    return (false, "Claim not found.", uploadedDocuments);
+                }
+
+                // Create upload directory if it doesn't exist
+                var claimUploadPath = Path.Combine(uploadPath, $"Claim_{claimId}");
+                if (!Directory.Exists(claimUploadPath))
+                {
+                    Directory.CreateDirectory(claimUploadPath);
                 }
 
                 foreach (var file in files)
                 {
-                    if (!ValidateFile(file))
+                    // Validate each file
+                    if (!ValidateFile(file, out string validationError))
                     {
-                        _logger.LogWarning($"File {file.FileName} failed validation");
+                        errorMessages.Add($"{file.FileName}: {validationError}");
+                        _logger.LogWarning($"File validation failed for {file.FileName}: {validationError}");
                         continue;
                     }
 
-                    var fileName = $"{Guid.NewGuid()}{Path.GetExtension(file.FileName)}";
-                    var filePath = Path.Combine(uploadPath, fileName);
-
-                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    try
                     {
-                        await file.CopyToAsync(stream);
+                        // Generate unique filename to prevent overwriting
+                        var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+                        var uniqueFileName = $"{Guid.NewGuid()}{fileExtension}";
+                        var filePath = Path.Combine(claimUploadPath, uniqueFileName);
+
+                        // Save file to disk
+                        using (var stream = new FileStream(filePath, FileMode.Create))
+                        {
+                            await file.CopyToAsync(stream);
+                        }
+
+                        // Create database record
+                        var document = new SupportingDocument
+                        {
+                            ClaimId = claimId,
+                            FileName = file.FileName, // Store original filename
+                            FileType = fileExtension.TrimStart('.').ToUpper(),
+                            FileSize = file.Length,
+                            FilePath = filePath, // Store actual file path
+                            UploadDate = DateTime.Now,
+                            IsActive = true
+                        };
+
+                        _context.SupportingDocuments.Add(document);
+                        uploadedDocuments.Add(document);
+
+                        _logger.LogInformation($"File uploaded successfully: {file.FileName} for Claim {claimId}");
                     }
-
-                    var document = new SupportingDocument
+                    catch (Exception ex)
                     {
-                        ClaimId = claimId,
-                        FileName = file.FileName,
-                        FileType = Path.GetExtension(file.FileName).TrimStart('.').ToUpper(),
-                        FileSize = file.Length,
-                        FilePath = $"/uploads/{claimId}/{fileName}",
-                        UploadDate = DateTime.Now,
-                        IsActive = true
-                    };
-
-                    _context.SupportingDocuments.Add(document);
+                        errorMessages.Add($"{file.FileName}: Upload failed - {ex.Message}");
+                        _logger.LogError(ex, $"Error uploading file {file.FileName}");
+                    }
                 }
 
-                await _context.SaveChangesAsync();
-                _logger.LogInformation($"Uploaded {files.Count} documents for claim {claimId}");
-                return true;
+                // Save all changes to database
+                if (uploadedDocuments.Any())
+                {
+                    await _context.SaveChangesAsync();
+                }
+
+                // Prepare response message
+                string message;
+                if (uploadedDocuments.Any() && !errorMessages.Any())
+                {
+                    message = $"Successfully uploaded {uploadedDocuments.Count} file(s).";
+                    return (true, message, uploadedDocuments);
+                }
+                else if (uploadedDocuments.Any() && errorMessages.Any())
+                {
+                    message = $"Uploaded {uploadedDocuments.Count} file(s). Errors: {string.Join("; ", errorMessages)}";
+                    return (true, message, uploadedDocuments);
+                }
+                else
+                {
+                    message = $"No files uploaded. Errors: {string.Join("; ", errorMessages)}";
+                    return (false, message, uploadedDocuments);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error uploading documents for claim {claimId}");
-                return false;
+                _logger.LogError(ex, $"Error in UploadFilesAsync for Claim {claimId}");
+                return (false, $"Upload failed: {ex.Message}", uploadedDocuments);
             }
         }
 
-        public async Task<byte[]> GetDocumentAsync(int documentId)
+        public async Task<bool> DeleteFileAsync(int documentId)
         {
             try
             {
                 var document = await _context.SupportingDocuments.FindAsync(documentId);
-                if (document == null) return null;
+                if (document == null)
+                {
+                    _logger.LogWarning($"Document {documentId} not found");
+                    return false;
+                }
 
-                var fullPath = Path.Combine(_environment.WebRootPath, document.FilePath.TrimStart('/'));
-                if (!File.Exists(fullPath)) return null;
+                // Delete physical file
+                if (File.Exists(document.FilePath))
+                {
+                    File.Delete(document.FilePath);
+                }
 
-                return await File.ReadAllBytesAsync(fullPath);
+                // Remove from database
+                _context.SupportingDocuments.Remove(document);
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation($"Document {documentId} deleted successfully");
+                return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error retrieving document {documentId}");
-                return null;
+                _logger.LogError(ex, $"Error deleting document {documentId}");
+                return false;
             }
         }
 
-        public bool ValidateFile(IFormFile file)
+        public async Task<(bool Success, byte[] FileData, string ContentType, string FileName)> DownloadFileAsync(int documentId)
         {
-            if (file == null || file.Length == 0)
-                return false;
+            try
+            {
+                var document = await _context.SupportingDocuments.FindAsync(documentId);
+                if (document == null)
+                {
+                    _logger.LogWarning($"Document {documentId} not found");
+                    return (false, null, null, null);
+                }
 
-            if (file.Length > _maxFileSize)
-                return false;
+                if (!File.Exists(document.FilePath))
+                {
+                    _logger.LogWarning($"Physical file not found: {document.FilePath}");
+                    return (false, null, null, null);
+                }
 
-            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-            return _allowedExtensions.Contains(extension);
+                var fileData = await File.ReadAllBytesAsync(document.FilePath);
+                var extension = Path.GetExtension(document.FileName).ToLowerInvariant();
+                var contentType = _mimeTypes.ContainsKey(extension)
+                    ? _mimeTypes[extension]
+                    : "application/octet-stream";
+
+                return (true, fileData, contentType, document.FileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error downloading document {documentId}");
+                return (false, null, null, null);
+            }
         }
 
         public async Task<List<SupportingDocument>> GetClaimDocumentsAsync(int claimId)
         {
-            return await _context.SupportingDocuments
-                .Where(d => d.ClaimId == claimId && d.IsActive)
-                .OrderBy(d => d.UploadDate)
-                .ToListAsync();
+            try
+            {
+                return await _context.SupportingDocuments
+                    .Where(d => d.ClaimId == claimId && d.IsActive)
+                    .OrderByDescending(d => d.UploadDate)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error retrieving documents for claim {claimId}");
+                return new List<SupportingDocument>();
+            }
         }
     }
 }

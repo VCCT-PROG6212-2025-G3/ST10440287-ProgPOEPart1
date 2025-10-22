@@ -1,75 +1,67 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using ProgPOE.Models;
 using ProgPOE.Services;
 using ProgPOE.Data;
-using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 
 namespace ProgPOE.Controllers
 {
     public class HomeController : Controller
     {
+        private readonly ILogger<HomeController> _logger;
         private readonly IClaimService _claimService;
         private readonly IFileService _fileService;
-        private readonly ILogger<HomeController> _logger;
         private readonly ApplicationDbContext _context;
+        private readonly IWebHostEnvironment _environment;
 
         public HomeController(
+            ILogger<HomeController> logger,
             IClaimService claimService,
             IFileService fileService,
-            ILogger<HomeController> logger,
-            ApplicationDbContext context)
+            ApplicationDbContext context,
+            IWebHostEnvironment environment)
         {
+            _logger = logger;
             _claimService = claimService;
             _fileService = fileService;
-            _logger = logger;
             _context = context;
+            _environment = environment;
         }
 
-        // GET: Home/Index - Landing page
+        // GET: Home/Index
         public IActionResult Index()
         {
-            // Set default session for lecturer
-            HttpContext.Session.SetInt32("UserId", 1);
-            HttpContext.Session.SetString("UserRole", "Lecturer");
-            HttpContext.Session.SetString("UserName", "Dr. John Smith");
-
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole");
-            ViewBag.UserName = HttpContext.Session.GetString("UserName");
-
             return View();
         }
 
         // GET: Home/Dashboard
         public async Task<IActionResult> Dashboard()
         {
-            var userId = HttpContext.Session.GetInt32("UserId") ?? 1;
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
-            ViewBag.UserName = HttpContext.Session.GetString("UserName") ?? "Dr. John Smith";
-
             try
             {
-                var model = await _claimService.GetDashboardDataAsync(userId);
-                return View(model);
+                // TODO: Get actual user ID from session/authentication
+                int userId = GetCurrentUserId();
+
+                var dashboardData = await _claimService.GetDashboardDataAsync(userId);
+                return View(dashboardData);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading dashboard");
-                TempData["ErrorMessage"] = "❌ Error loading dashboard data.";
-                return View(new DashboardViewModel());
+                TempData["Error"] = "Error loading dashboard data.";
+                return RedirectToAction("Index");
             }
         }
 
         // GET: Home/SubmitClaim
         public IActionResult SubmitClaim()
         {
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
-            ViewBag.UserName = HttpContext.Session.GetString("UserName") ?? "Dr. John Smith";
-
             var model = new SubmitClaimViewModel
             {
-                MonthYear = DateTime.Now.AddMonths(-1).ToString("yyyy-MM"),
-                HourlyRate = 450.00m
+                // Pre-fill with current month
+                MonthYear = DateTime.Now.ToString("yyyy-MM"),
+                // Get user's default rate from session or database
+                HourlyRate = GetUserDefaultRate()
             };
 
             return View(model);
@@ -80,43 +72,16 @@ namespace ProgPOE.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> SubmitClaim(SubmitClaimViewModel model)
         {
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
-            ViewBag.UserName = HttpContext.Session.GetString("UserName") ?? "Dr. John Smith";
-
-            _logger.LogInformation($"SubmitClaim: MonthYear={model.MonthYear}, Hours={model.HoursWorked}, Rate={model.HourlyRate}");
-
-            if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("ModelState is invalid");
-                TempData["ErrorMessage"] = "❌ Please correct the errors in the form.";
-                return View(model);
-            }
-
-            var userId = HttpContext.Session.GetInt32("UserId") ?? 1;
-
             try
             {
-                // Verify user exists
-                var user = await _context.Users.FindAsync(userId);
-                if (user == null)
+                if (!ModelState.IsValid)
                 {
-                    _logger.LogError($"User {userId} not found in database");
-                    TempData["ErrorMessage"] = "❌ User not found. Please log in again.";
+                    TempData["Error"] = "Please correct the errors in the form.";
                     return View(model);
                 }
 
-                _logger.LogInformation($"User found: {user.FullName}");
-
-                // Check if claim already exists
-                var existingClaim = await _context.Claims
-                    .FirstOrDefaultAsync(c => c.LecturerId == userId && c.MonthYear == model.MonthYear);
-
-                if (existingClaim != null)
-                {
-                    _logger.LogWarning($"Duplicate claim attempt for period {model.MonthYear}");
-                    TempData["ErrorMessage"] = $"❌ A claim for {model.MonthYear} already exists! Please choose a different period.";
-                    return View(model);
-                }
+                // Get current user ID
+                int userId = GetCurrentUserId();
 
                 // Create new claim
                 var claim = new Claim
@@ -130,42 +95,42 @@ namespace ProgPOE.Controllers
                     LecturerNotes = model.Notes
                 };
 
-                _logger.LogInformation("Adding claim to context");
+                // Add claim to database
                 _context.Claims.Add(claim);
-
-                _logger.LogInformation("Saving changes to database");
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation($"Claim created successfully with ID: {claim.ClaimId}");
-
-                // Handle file uploads
-                var files = Request.Form.Files;
-                if (files != null && files.Count > 0)
+                // Handle file uploads if any
+                if (model.Documents != null && model.Documents.Any())
                 {
-                    _logger.LogInformation($"Uploading {files.Count} files");
-                    var uploadResult = await _fileService.UploadDocumentsAsync(claim.ClaimId, files.ToList());
+                    var uploadPath = Path.Combine(_environment.ContentRootPath, "uploads");
 
-                    if (!uploadResult)
+                    var uploadResult = await _fileService.UploadFilesAsync(
+                        claim.ClaimId,
+                        model.Documents,
+                        uploadPath);
+
+                    if (!uploadResult.Success)
                     {
-                        _logger.LogWarning("File upload failed but claim was saved");
+                        _logger.LogWarning($"File upload issues: {uploadResult.Message}");
+                        TempData["Warning"] = $"Claim submitted but some files failed to upload: {uploadResult.Message}";
+                    }
+                    else
+                    {
+                        TempData["Success"] = $"Claim submitted successfully with {uploadResult.Documents.Count} document(s)!";
                     }
                 }
+                else
+                {
+                    TempData["Success"] = "Claim submitted successfully!";
+                }
 
-                TempData["SuccessMessage"] = $"✅ Claim submitted successfully! Your claim for {model.MonthYear} totaling R {claim.TotalAmount:N2} is now pending coordinator review.";
+                _logger.LogInformation($"Claim {claim.ClaimId} submitted by user {userId}");
                 return RedirectToAction("MyClaims");
-            }
-            catch (DbUpdateException dbEx)
-            {
-                _logger.LogError(dbEx, "Database update error");
-                _logger.LogError($"Inner Exception: {dbEx.InnerException?.Message}");
-                TempData["ErrorMessage"] = $"❌ Database error: {dbEx.InnerException?.Message ?? dbEx.Message}";
-                return View(model);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error submitting claim");
-                _logger.LogError($"Inner Exception: {ex.InnerException?.Message}");
-                TempData["ErrorMessage"] = $"❌ Error: {ex.InnerException?.Message ?? ex.Message}";
+                TempData["Error"] = "An error occurred while submitting your claim. Please try again.";
                 return View(model);
             }
         }
@@ -173,246 +138,38 @@ namespace ProgPOE.Controllers
         // GET: Home/MyClaims
         public async Task<IActionResult> MyClaims()
         {
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
-            ViewBag.UserName = HttpContext.Session.GetString("UserName") ?? "Dr. John Smith";
-
-            var userId = HttpContext.Session.GetInt32("UserId") ?? 1;
-
-            _logger.LogInformation($"MyClaims - Getting claims for UserId: {userId}");
-
             try
             {
-                var claims = await _context.Claims
-                    .Include(c => c.Lecturer)
-                    .Include(c => c.Documents)
-                    .Where(c => c.LecturerId == userId)
-                    .OrderByDescending(c => c.SubmissionDate)
-                    .ToListAsync();
-
-                _logger.LogInformation($"MyClaims - Found {claims.Count} claims");
-
-                // Log each claim for debugging
-                foreach (var claim in claims)
-                {
-                    _logger.LogInformation($"Claim: ID={claim.ClaimId}, Period={claim.MonthYear}, Amount=R{claim.TotalAmount}, Status={claim.Status}");
-                }
-
+                int userId = GetCurrentUserId();
+                var claims = await _claimService.GetUserClaimsAsync(userId);
                 return View(claims);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving claims");
-                TempData["ErrorMessage"] = "❌ Error loading your claims.";
-                return View(new List<Claim>());
+                _logger.LogError(ex, "Error loading claims");
+                TempData["Error"] = "Error loading your claims.";
+                return RedirectToAction("Dashboard");
             }
         }
 
-        // GET: Home/ApproveClaims - Claims approval interface
-        public async Task<IActionResult> ApproveClaims()
-        {
-            // Get current user role
-            var userRole = HttpContext.Session.GetString("UserRole");
-            var userId = HttpContext.Session.GetInt32("UserId");
-
-            // Determine if user is coordinator or manager
-            bool isCoordinator = userRole == "ProgrammeCoordinator";
-            bool isManager = userRole == "AcademicManager";
-
-            // If neither, set to coordinator by default
-            if (!isCoordinator && !isManager)
-            {
-                HttpContext.Session.SetInt32("UserId", 2);
-                HttpContext.Session.SetString("UserRole", "ProgrammeCoordinator");
-                ViewBag.UserRole = "Programme Coordinator";
-                ViewBag.UserName = "Dr. Jane Wilson";
-                isCoordinator = true;
-            }
-            else
-            {
-                ViewBag.UserRole = isCoordinator ? "Programme Coordinator" : "Academic Manager";
-                ViewBag.UserName = HttpContext.Session.GetString("UserName") ??
-                    (isCoordinator ? "Dr. Jane Wilson" : "Prof. Mike Johnson");
-            }
-
-            _logger.LogInformation($"ApproveClaims - Loading claims for role: {ViewBag.UserRole}");
-
-            try
-            {
-                List<Claim> claims;
-
-                if (isCoordinator)
-                {
-                    // Coordinators see only claims with Pending status
-                    claims = await _context.Claims
-                        .Include(c => c.Lecturer)
-                        .Include(c => c.Documents)
-                        .Where(c => c.Status == ClaimStatus.Pending)
-                        .OrderBy(c => c.SubmissionDate)
-                        .ToListAsync();
-
-                    _logger.LogInformation($"ApproveClaims - Found {claims.Count} pending claims for coordinator");
-                }
-                else
-                {
-                    // Managers see only claims with PendingManager status
-                    claims = await _context.Claims
-                        .Include(c => c.Lecturer)
-                        .Include(c => c.Documents)
-                        .Where(c => c.Status == ClaimStatus.PendingManager)
-                        .OrderBy(c => c.SubmissionDate)
-                        .ToListAsync();
-
-                    _logger.LogInformation($"ApproveClaims - Found {claims.Count} pending claims for manager");
-                }
-
-                // Pass the role to the view
-                ViewBag.IsCoordinator = isCoordinator;
-                ViewBag.IsManager = isManager;
-
-                return View(claims);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error loading pending claims");
-                TempData["ErrorMessage"] = "❌ Error loading pending claims.";
-                return View(new List<Claim>());
-            }
-        }
-
-        // POST: Home/ProcessApproval - Handle approval action
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ProcessApproval(int claimId, string action, string comments)
-        {
-            var approverId = HttpContext.Session.GetInt32("UserId") ?? 2;
-
-            _logger.LogInformation($"ProcessApproval - ClaimId: {claimId}, Action: {action}, ApproverId: {approverId}");
-
-            // Validate action
-            if (!Enum.TryParse<ApprovalAction>(action, true, out var approvalAction))
-            {
-                _logger.LogWarning($"Invalid approval action: {action}");
-                TempData["ErrorMessage"] = "❌ Invalid action specified.";
-                return RedirectToAction("ApproveClaims");
-            }
-
-            // Validate rejection/return comments
-            if ((approvalAction == ApprovalAction.Reject || approvalAction == ApprovalAction.Return) &&
-                string.IsNullOrWhiteSpace(comments))
-            {
-                TempData["ErrorMessage"] = "❌ Comments are required when rejecting or returning a claim.";
-                return RedirectToAction("ApproveClaims");
-            }
-
-            try
-            {
-                var claim = await _context.Claims
-                    .Include(c => c.Lecturer)
-                    .FirstOrDefaultAsync(c => c.ClaimId == claimId);
-
-                if (claim == null)
-                {
-                    _logger.LogWarning($"Claim {claimId} not found");
-                    TempData["ErrorMessage"] = "❌ Claim not found.";
-                    return RedirectToAction("ApproveClaims");
-                }
-
-                var approver = await _context.Users.FindAsync(approverId);
-                if (approver == null)
-                {
-                    _logger.LogWarning($"Approver {approverId} not found");
-                    TempData["ErrorMessage"] = "❌ Approver not found.";
-                    return RedirectToAction("ApproveClaims");
-                }
-
-                var lecturerName = claim.Lecturer?.FullName ?? "Unknown Lecturer";
-
-                // Process the approval
-                switch (approvalAction)
-                {
-                    case ApprovalAction.Approve:
-                        if (approver.Role == UserRole.ProgrammeCoordinator)
-                        {
-                            claim.Status = ClaimStatus.PendingManager;
-                            claim.CoordinatorApprovalDate = DateTime.Now;
-                            claim.CoordinatorNotes = comments ?? "Approved by coordinator - forwarded to manager";
-                            _logger.LogInformation($"Claim {claimId} approved by coordinator, now pending manager");
-
-                            TempData["SuccessMessage"] = $"✅ Claim CL-{claimId:D6} for {lecturerName} approved and forwarded to Academic Manager for final review!";
-                        }
-                        else if (approver.Role == UserRole.AcademicManager)
-                        {
-                            claim.Status = ClaimStatus.Approved;
-                            claim.ManagerApprovalDate = DateTime.Now;
-                            claim.ManagerNotes = comments ?? "Final approval granted";
-                            _logger.LogInformation($"Claim {claimId} fully approved by manager");
-
-                            TempData["SuccessMessage"] = $"✅ Claim CL-{claimId:D6} for {lecturerName} has been fully approved! Payment will be processed.";
-                        }
-                        break;
-
-                    case ApprovalAction.Reject:
-                        claim.Status = ClaimStatus.Rejected;
-                        if (approver.Role == UserRole.ProgrammeCoordinator)
-                        {
-                            claim.CoordinatorNotes = comments;
-                        }
-                        else
-                        {
-                            claim.ManagerNotes = comments;
-                        }
-                        _logger.LogInformation($"Claim {claimId} rejected by {approver.Role}");
-
-                        TempData["SuccessMessage"] = $"❌ Claim CL-{claimId:D6} for {lecturerName} has been rejected. The lecturer will be notified.";
-                        break;
-
-                    case ApprovalAction.Return:
-                        claim.Status = ClaimStatus.Returned;
-                        if (approver.Role == UserRole.ProgrammeCoordinator)
-                        {
-                            claim.CoordinatorNotes = comments;
-                        }
-                        else
-                        {
-                            claim.ManagerNotes = comments;
-                        }
-                        _logger.LogInformation($"Claim {claimId} returned for revision by {approver.Role}");
-
-                        TempData["SuccessMessage"] = $"↩️ Claim CL-{claimId:D6} for {lecturerName} has been returned for revision. The lecturer can resubmit.";
-                        break;
-                }
-
-                await _context.SaveChangesAsync();
-
-                _logger.LogInformation($"Claim {claimId} successfully processed");
-
-                return RedirectToAction("ApproveClaims");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error processing approval for claim {claimId}");
-                TempData["ErrorMessage"] = $"❌ An error occurred while processing the approval: {ex.Message}";
-                return RedirectToAction("ApproveClaims");
-            }
-        }
-
-        // GET: Home/ViewClaim - View specific claim details
+        // GET: Home/ViewClaim/5
         public async Task<IActionResult> ViewClaim(int id)
         {
-            ViewBag.UserRole = HttpContext.Session.GetString("UserRole") ?? "Lecturer";
-            ViewBag.UserName = HttpContext.Session.GetString("UserName") ?? "Dr. John Smith";
-
             try
             {
-                var claim = await _context.Claims
-                    .Include(c => c.Lecturer)
-                    .Include(c => c.Documents)
-                    .FirstOrDefaultAsync(c => c.ClaimId == id);
+                var claim = await _claimService.GetClaimByIdAsync(id);
 
                 if (claim == null)
                 {
-                    _logger.LogWarning($"Claim {id} not found");
-                    TempData["ErrorMessage"] = "❌ Claim not found.";
+                    TempData["Error"] = "Claim not found.";
+                    return RedirectToAction("MyClaims");
+                }
+
+                // TODO: Add authorization check - ensure user can view this claim
+                int userId = GetCurrentUserId();
+                if (claim.LecturerId != userId)
+                {
+                    TempData["Error"] = "You are not authorized to view this claim.";
                     return RedirectToAction("MyClaims");
                 }
 
@@ -420,168 +177,222 @@ namespace ProgPOE.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error loading claim {id}");
-                TempData["ErrorMessage"] = "❌ Error loading claim details.";
+                _logger.LogError(ex, $"Error viewing claim {id}");
+                TempData["Error"] = "Error loading claim details.";
                 return RedirectToAction("MyClaims");
             }
         }
 
-        // GET: Home/SwitchRole - Switch between user roles (for testing)
-        public IActionResult SwitchRole(string role)
-        {
-            switch (role?.ToLower())
-            {
-                case "lecturer":
-                    HttpContext.Session.SetInt32("UserId", 1);
-                    HttpContext.Session.SetString("UserRole", "Lecturer");
-                    HttpContext.Session.SetString("UserName", "Dr. John Smith");
-                    TempData["SuccessMessage"] = "✅ Switched to Lecturer role";
-                    return RedirectToAction("Dashboard");
-
-                case "coordinator":
-                    HttpContext.Session.SetInt32("UserId", 2);
-                    HttpContext.Session.SetString("UserRole", "ProgrammeCoordinator");
-                    HttpContext.Session.SetString("UserName", "Dr. Jane Wilson");
-                    TempData["SuccessMessage"] = "✅ Switched to Programme Coordinator role";
-                    return RedirectToAction("ApproveClaims");
-
-                case "manager":
-                    HttpContext.Session.SetInt32("UserId", 3);
-                    HttpContext.Session.SetString("UserRole", "AcademicManager");
-                    HttpContext.Session.SetString("UserName", "Prof. Mike Johnson");
-                    TempData["SuccessMessage"] = "✅ Switched to Academic Manager role";
-                    return RedirectToAction("ApproveClaims");
-
-                default:
-                    TempData["ErrorMessage"] = "❌ Invalid role specified";
-                    return RedirectToAction("Index");
-            }
-        }
-
-        // Debug endpoints - Remove in production
-        #region Debug Endpoints
-
-        [HttpGet]
-        public async Task<IActionResult> ResetDatabase()
+        // GET: Home/ApproveClaims
+        public async Task<IActionResult> ApproveClaims()
         {
             try
             {
-                _logger.LogInformation("Resetting database - removing all claims and documents");
-
-                var claims = await _context.Claims.ToListAsync();
-                _context.Claims.RemoveRange(claims);
-
-                var documents = await _context.SupportingDocuments.ToListAsync();
-                _context.SupportingDocuments.RemoveRange(documents);
-
-                await _context.SaveChangesAsync();
-
-                TempData["SuccessMessage"] = "✅ Database reset successfully! All claims and documents removed.";
-                _logger.LogInformation("Database reset completed");
-
-                return RedirectToAction("Dashboard");
+                var pendingClaims = await _claimService.GetPendingClaimsAsync();
+                return View(pendingClaims);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error resetting database");
-                TempData["ErrorMessage"] = $"❌ Error resetting database: {ex.Message}";
+                _logger.LogError(ex, "Error loading pending claims");
+                TempData["Error"] = "Error loading pending claims.";
                 return RedirectToAction("Dashboard");
             }
         }
 
-        [HttpGet]
-        public async Task<IActionResult> ViewAllClaims()
+        // POST: Home/ProcessApproval
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ProcessApproval(int claimId, ApprovalAction action, string comments)
         {
             try
             {
-                var allClaims = await _context.Claims
-                    .Include(c => c.Lecturer)
-                    .OrderByDescending(c => c.SubmissionDate)
-                    .ToListAsync();
+                int approverId = GetCurrentUserId();
 
-                var details = string.Join("\n", allClaims.Select(c =>
-                    $"ID: {c.ClaimId} | User: {c.LecturerId} ({c.Lecturer?.FullName}) | Period: {c.MonthYear} | Amount: R{c.TotalAmount:N2} | Status: {c.Status}"));
+                var result = await _claimService.ProcessApprovalAsync(claimId, action, comments, approverId);
 
-                return Content($"=== ALL CLAIMS IN DATABASE ===\n\nTotal Claims: {allClaims.Count}\n\n{details}", "text/plain");
+                if (result)
+                {
+                    TempData["Success"] = $"Claim {action.ToString().ToLower()}d successfully!";
+                }
+                else
+                {
+                    TempData["Error"] = "Error processing approval.";
+                }
+
+                return RedirectToAction("ApproveClaims");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error viewing all claims");
-                return Content($"Error: {ex.Message}", "text/plain");
+                _logger.LogError(ex, $"Error processing approval for claim {claimId}");
+                TempData["Error"] = "An error occurred while processing the approval.";
+                return RedirectToAction("ApproveClaims");
             }
         }
 
-        [HttpGet]
-        public async Task<IActionResult> CheckDatabase()
+        // GET: Home/DownloadDocument/5
+        public async Task<IActionResult> DownloadDocument(int id)
         {
             try
             {
-                var userId = HttpContext.Session.GetInt32("UserId") ?? 1;
+                var result = await _fileService.DownloadFileAsync(id);
 
-                var allClaims = await _context.Claims.ToListAsync();
-                var userClaims = await _context.Claims.Where(c => c.LecturerId == userId).ToListAsync();
-                var users = await _context.Users.ToListAsync();
-
-                var result = $"=== DATABASE CHECK ===\n\n";
-                result += $"Session UserId: {userId}\n";
-                result += $"Session UserRole: {HttpContext.Session.GetString("UserRole")}\n";
-                result += $"Session UserName: {HttpContext.Session.GetString("UserName")}\n\n";
-
-                result += $"Total Users in DB: {users.Count}\n";
-                foreach (var u in users)
+                if (!result.Success)
                 {
-                    result += $"  - User {u.UserId}: {u.FirstName} {u.LastName} ({u.Role})\n";
+                    TempData["Error"] = "Document not found.";
+                    return RedirectToAction("MyClaims");
                 }
 
-                result += $"\nTotal Claims in DB: {allClaims.Count}\n";
-                foreach (var c in allClaims)
-                {
-                    result += $"  - Claim {c.ClaimId}: User={c.LecturerId}, Period={c.MonthYear}, Amount=R{c.TotalAmount:N2}, Status={c.Status}\n";
-                }
-
-                result += $"\nClaims for Current User (UserId {userId}): {userClaims.Count}\n";
-                foreach (var c in userClaims)
-                {
-                    result += $"  - Claim {c.ClaimId}: Period={c.MonthYear}, Amount=R{c.TotalAmount:N2}, Status={c.Status}\n";
-                }
-
-                var pendingClaims = allClaims.Where(c => c.Status == ClaimStatus.Pending).ToList();
-                result += $"\nPending Claims (Coordinator): {pendingClaims.Count}\n";
-                foreach (var c in pendingClaims)
-                {
-                    result += $"  - Claim {c.ClaimId}: Period={c.MonthYear}, Amount=R{c.TotalAmount:N2}\n";
-                }
-
-                var pendingManagerClaims = allClaims.Where(c => c.Status == ClaimStatus.PendingManager).ToList();
-                result += $"\nPending Manager Claims: {pendingManagerClaims.Count}\n";
-                foreach (var c in pendingManagerClaims)
-                {
-                    result += $"  - Claim {c.ClaimId}: Period={c.MonthYear}, Amount=R{c.TotalAmount:N2}\n";
-                }
-
-                var approvedClaims = allClaims.Where(c => c.Status == ClaimStatus.Approved).ToList();
-                result += $"\nApproved Claims: {approvedClaims.Count}\n";
-                foreach (var c in approvedClaims)
-                {
-                    result += $"  - Claim {c.ClaimId}: Period={c.MonthYear}, Amount=R{c.TotalAmount:N2}\n";
-                }
-
-                return Content(result, "text/plain");
+                return File(result.FileData, result.ContentType, result.FileName);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking database");
-                return Content($"Error: {ex.Message}\n\nStack Trace: {ex.StackTrace}", "text/plain");
+                _logger.LogError(ex, $"Error downloading document {id}");
+                TempData["Error"] = "Error downloading document.";
+                return RedirectToAction("MyClaims");
             }
         }
 
-        #endregion
+        // POST: Home/DeleteDocument
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteDocument(int documentId, int claimId)
+        {
+            try
+            {
+                // TODO: Add authorization - only allow deletion by claim owner and if claim is pending
+                var claim = await _claimService.GetClaimByIdAsync(claimId);
 
-        // Error handler
+                if (claim == null || claim.Status != ClaimStatus.Pending)
+                {
+                    TempData["Error"] = "Cannot delete documents from this claim.";
+                    return RedirectToAction("ViewClaim", new { id = claimId });
+                }
+
+                var result = await _fileService.DeleteFileAsync(documentId);
+
+                if (result)
+                {
+                    TempData["Success"] = "Document deleted successfully.";
+                }
+                else
+                {
+                    TempData["Error"] = "Error deleting document.";
+                }
+
+                return RedirectToAction("ViewClaim", new { id = claimId });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting document {documentId}");
+                TempData["Error"] = "An error occurred while deleting the document.";
+                return RedirectToAction("MyClaims");
+            }
+        }
+
+        // GET: Home/UploadDocuments/5
+        public async Task<IActionResult> UploadDocuments(int id)
+        {
+            try
+            {
+                var claim = await _claimService.GetClaimByIdAsync(id);
+
+                if (claim == null)
+                {
+                    TempData["Error"] = "Claim not found.";
+                    return RedirectToAction("MyClaims");
+                }
+
+                // Only allow upload for pending claims
+                if (claim.Status != ClaimStatus.Pending && claim.Status != ClaimStatus.Returned)
+                {
+                    TempData["Error"] = "Cannot upload documents to this claim.";
+                    return RedirectToAction("ViewClaim", new { id });
+                }
+
+                var model = new DocumentUploadViewModel
+                {
+                    ClaimId = id
+                };
+
+                ViewBag.Claim = claim;
+                return View(model);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error loading upload page for claim {id}");
+                TempData["Error"] = "Error loading upload page.";
+                return RedirectToAction("MyClaims");
+            }
+        }
+
+        // POST: Home/UploadDocuments
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> UploadDocuments(DocumentUploadViewModel model)
+        {
+            try
+            {
+                if (model.Files == null || !model.Files.Any())
+                {
+                    TempData["Error"] = "Please select at least one file to upload.";
+                    return RedirectToAction("UploadDocuments", new { id = model.ClaimId });
+                }
+
+                var uploadPath = Path.Combine(_environment.ContentRootPath, "uploads");
+
+                var result = await _fileService.UploadFilesAsync(
+                    model.ClaimId,
+                    model.Files,
+                    uploadPath);
+
+                if (result.Success)
+                {
+                    TempData["Success"] = result.Message;
+                }
+                else
+                {
+                    TempData["Error"] = result.Message;
+                }
+
+                return RedirectToAction("ViewClaim", new { id = model.ClaimId });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error uploading documents for claim {model.ClaimId}");
+                TempData["Error"] = "An error occurred while uploading documents.";
+                return RedirectToAction("UploadDocuments", new { id = model.ClaimId });
+            }
+        }
+
+        // Helper method to get current user ID
+        // TODO: Replace with actual authentication
+        private int GetCurrentUserId()
+        {
+            // Temporarily return user 1 (John Smith - Lecturer)
+            // In production, get from HttpContext.Session or User.Identity
+            return HttpContext.Session.GetInt32("UserId") ?? 1;
+        }
+
+        // Helper method to get user's default hourly rate
+        private decimal GetUserDefaultRate()
+        {
+            try
+            {
+                int userId = GetCurrentUserId();
+                var user = _context.Users.Find(userId);
+                return user?.DefaultHourlyRate ?? 450.00m;
+            }
+            catch
+            {
+                return 450.00m; // Default fallback
+            }
+        }
+
+        // Error page
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
         public IActionResult Error()
         {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            return View();
         }
     }
 }
