@@ -9,28 +9,35 @@ namespace ProgPOE
     {
         public static void Main(string[] args)
         {
+            // Create builder for configuring services and middleware
             var builder = WebApplication.CreateBuilder(args);
 
+            // Add MVC controllers with views
             builder.Services.AddControllersWithViews();
 
+            // Configure Entity Framework Core with SQLite using connection string
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+            // Register services for dependency injection
             builder.Services.AddScoped<IClaimService, ClaimService>();
             builder.Services.AddScoped<IFileService, FileService>();
 
+            // Configure session options
             builder.Services.AddSession(options =>
             {
-                options.IdleTimeout = TimeSpan.FromMinutes(30);
-                options.Cookie.HttpOnly = true;
-                options.Cookie.IsEssential = true;
+                options.IdleTimeout = TimeSpan.FromMinutes(30); // Session timeout
+                options.Cookie.HttpOnly = true; // Prevent client-side scripts from accessing cookie
+                options.Cookie.IsEssential = true; // Required for GDPR compliance
             });
 
+            // Make HttpContext available in services
             builder.Services.AddHttpContextAccessor();
 
+            // Build the application
             var app = builder.Build();
 
-            // Initialize database and upload directory
+            // Initialize database and uploads directory
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
@@ -41,18 +48,21 @@ namespace ProgPOE
                 {
                     var context = services.GetRequiredService<ApplicationDbContext>();
 
+                    // Delete existing database (for development/testing purposes)
                     logger.LogInformation("Deleting existing database...");
                     context.Database.EnsureDeleted();
 
+                    // Create new database
                     logger.LogInformation("Creating new database...");
                     context.Database.EnsureCreated();
 
+                    // Seed database with default users
                     logger.LogInformation("Seeding database...");
                     SeedDatabase(context, logger);
 
                     logger.LogInformation("Database initialized successfully!");
 
-                    // Create uploads directory if it doesn't exist
+                    // Ensure uploads directory exists
                     var uploadsPath = Path.Combine(environment.ContentRootPath, "uploads");
                     if (!Directory.Exists(uploadsPath))
                     {
@@ -72,31 +82,36 @@ namespace ProgPOE
                 }
             }
 
+            // Configure middleware pipeline
             if (!app.Environment.IsDevelopment())
             {
-                app.UseExceptionHandler("/Home/Error");
-                app.UseHsts();
+                app.UseExceptionHandler("/Home/Error"); // Custom error page
+                app.UseHsts(); // Enforce HTTPS in production
             }
 
-            app.UseHttpsRedirection();
-            app.UseStaticFiles();
+            app.UseHttpsRedirection(); // Redirect HTTP to HTTPS
+            app.UseStaticFiles(); // Serve static files (CSS, JS, images)
 
-            app.UseRouting();
+            app.UseRouting(); // Enable endpoint routing
 
-            app.UseSession();
-            app.UseAuthorization();
+            app.UseSession(); // Enable session state
+            app.UseAuthorization(); // Enable authorization middleware
 
+            // Map default controller route: Home/Index
             app.MapControllerRoute(
                 name: "default",
                 pattern: "{controller=Home}/{action=Index}/{id?}");
 
+            // Run the application
             app.Run();
         }
 
+        // Seed the database with default users
         private static void SeedDatabase(ApplicationDbContext context, ILogger logger)
         {
             try
             {
+                // Check if users already exist
                 if (!context.Users.Any())
                 {
                     logger.LogInformation("Seeding users...");
@@ -165,4 +180,4 @@ namespace ProgPOE
 // - Bootstrap Documentation: https://getbootstrap.com/docs/5.1/getting-started/introduction/
 // - jQuery Documentation: https://api.jquery.com/
 // - File Upload Security: https://owasp.org/www-community/vulnerabilities/Unrestricted_File_Upload
-// - ChatGPT https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a
+// - ChatGPT: https://chatgpt.com/share/68cb0efe-b6d4-8001-8e7b-dd56bf04cc8a

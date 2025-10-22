@@ -3,50 +3,66 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProgPOE.Models
 {
+    // Represents a lecturer's claim for hours worked
     public class Claim
     {
+        // Primary key for the claim
         public int ClaimId { get; set; }
 
+        // Foreign key linking claim to a lecturer
         [Required]
         public int LecturerId { get; set; }
 
+        // Month and year of the claim in MM/YYYY format
         [Required]
         [StringLength(7)]
         public string MonthYear { get; set; } = string.Empty;
 
+        // Number of hours worked (must be between 0.1 and 744)
         [Required]
         [Range(0.1, 744)]
         public decimal HoursWorked { get; set; }
 
+        // Hourly rate (must be between 1 and 9999.99)
         [Required]
         [Range(1, 9999.99)]
         public decimal HourlyRate { get; set; }
 
+        // Total amount calculated from HoursWorked * HourlyRate
         [NotMapped]
         public decimal TotalAmount => HoursWorked * HourlyRate;
 
+        // Current status of the claim
         public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
 
+        // Date claim was submitted
         public DateTime SubmissionDate { get; set; } = DateTime.Now;
 
+        // Date coordinator approved/reviewed the claim
         public DateTime? CoordinatorApprovalDate { get; set; }
 
+        // Date manager approved/reviewed the claim
         public DateTime? ManagerApprovalDate { get; set; }
 
+        // Optional notes by the lecturer
         [StringLength(1000)]
         public string? LecturerNotes { get; set; }
 
+        // Optional notes by the coordinator
         [StringLength(1000)]
         public string? CoordinatorNotes { get; set; }
 
+        // Optional notes by the manager
         [StringLength(1000)]
         public string? ManagerNotes { get; set; }
 
-        // Navigation properties
+        // Navigation property to the lecturer (user)
         public virtual User? Lecturer { get; set; }
+
+        // Navigation property for supporting documents attached to the claim
         public virtual ICollection<SupportingDocument> Documents { get; set; } = new List<SupportingDocument>();
 
-        // Status tracking methods
+        // Human-readable text representation of claim status
         [NotMapped]
         public string StatusDisplayText => Status switch
         {
@@ -58,6 +74,7 @@ namespace ProgPOE.Models
             _ => "Unknown"
         };
 
+        // Color code for status display in UI
         [NotMapped]
         public string StatusColor => Status switch
         {
@@ -69,6 +86,7 @@ namespace ProgPOE.Models
             _ => "#6c757d"
         };
 
+        // Emoji/icon representation of claim status
         [NotMapped]
         public string StatusIcon => Status switch
         {
@@ -80,6 +98,7 @@ namespace ProgPOE.Models
             _ => "📋"
         };
 
+        // Progress percentage used in UI progress bars
         [NotMapped]
         public int ProgressPercentage => Status switch
         {
@@ -91,6 +110,7 @@ namespace ProgPOE.Models
             _ => 0
         };
 
+        // Progress bar bootstrap color class
         [NotMapped]
         public string ProgressBarColor => Status switch
         {
@@ -102,6 +122,7 @@ namespace ProgPOE.Models
             _ => "secondary"
         };
 
+        // History of claim status changes for display in UI
         [NotMapped]
         public List<StatusHistoryItem> StatusHistory
         {
@@ -159,6 +180,7 @@ namespace ProgPOE.Models
         }
     }
 
+    // Enum representing claim status options
     public enum ClaimStatus
     {
         Pending,
@@ -168,14 +190,15 @@ namespace ProgPOE.Models
         Returned
     }
 
+    // Represents a single step in claim status history
     public class StatusHistoryItem
     {
-        public int Step { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Description { get; set; } = string.Empty;
-        public DateTime? Date { get; set; }
-        public bool IsCompleted { get; set; }
-        public string Icon { get; set; } = "📋";
-        public string? Notes { get; set; }
+        public int Step { get; set; } // Step number in workflow
+        public string Title { get; set; } = string.Empty; // Step title
+        public string Description { get; set; } = string.Empty; // Description of status
+        public DateTime? Date { get; set; } // Date when step occurred
+        public bool IsCompleted { get; set; } // Whether the step is completed
+        public string Icon { get; set; } = "📋"; // Icon representing the step
+        public string? Notes { get; set; } // Optional notes/comments for the step
     }
 }

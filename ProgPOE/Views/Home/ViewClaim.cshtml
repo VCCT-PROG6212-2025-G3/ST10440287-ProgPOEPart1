@@ -418,8 +418,6 @@
             <text>
                 setInterval(function() {
                     console.log('Auto-refreshing claim status...');
-                    // In a real application, you would use AJAX to check status without full page reload
-                    // For now, we'll just add a visual indicator
                     const indicator = document.querySelector('.live-status-indicator');
                     if (indicator) {
                         indicator.style.animation = 'none';
