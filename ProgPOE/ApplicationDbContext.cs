@@ -6,7 +6,7 @@ namespace ProgPOE.Data
     // Main EF Core database context for the application
     public class ApplicationDbContext : DbContext
     {
-        // Constructor accepting DbContextOptions (used for dependency injection)
+        // Constructor accepting DbContextOptions
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
             : base(options)
         {
