@@ -1,1 +1,3 @@
 # ProgPOE
+This document tells you everything you need to know about how lecturer feedback was collected, analyzed, and used in the Contract Monthly Claim System. Four main topics were the focus of the feedback: system reliability, accurate testing, transparent status tracking, and document upload capability. All suggestions have been effectively put into use, along with extra improvements to strengthen the system's reliability and user experience.
+With 26 unit tests passing and excellent error handling across the program, the implementation fully completed all needed functionalities. The system now offers a safe, dependable, and easy-to-use platform for managing monthly claims.
