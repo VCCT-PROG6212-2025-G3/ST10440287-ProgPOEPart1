@@ -26,6 +26,8 @@ namespace ProgPOE
             builder.Services.AddScoped<IClaimValidationService, ClaimValidationService>();
             builder.Services.AddScoped<IApprovalWorkflowService, ApprovalWorkflowService>();
 
+            builder.Services.AddScoped<IHRService, HRService>();
+
             // Configure session options
             builder.Services.AddSession(options =>
             {
@@ -153,6 +155,18 @@ namespace ProgPOE
                             LastName = "Johnson",
                             Role = UserRole.AcademicManager,
                             Department = "Computer Science",
+                            DefaultHourlyRate = null,
+                            CreatedDate = DateTime.Now,
+                            IsActive = true
+                        },
+                        new User
+                        {
+                            Username = "sarah.adams",
+                            Email = "sarah.adams@university.ac.za",
+                            FirstName = "Sarah",
+                            LastName = "Adams",
+                            Role = UserRole.HR,
+                            Department = "Human Resources",
                             DefaultHourlyRate = null,
                             CreatedDate = DateTime.Now,
                             IsActive = true

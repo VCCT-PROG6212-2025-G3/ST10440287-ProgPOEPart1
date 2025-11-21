@@ -57,6 +57,7 @@ namespace ProgPOE.Models
     {
         Lecturer,              // Basic user who submits claims
         ProgrammeCoordinator,  // Approves claims before manager review
-        AcademicManager         // Final approver of claims
+        AcademicManager,         // Final approver of claims
+        HR                     // Human Resources - manages lecturers and generates reports
     }
 }
