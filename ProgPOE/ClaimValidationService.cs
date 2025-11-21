@@ -3,54 +3,55 @@ using ProgPOE.Models;
 
 namespace ProgPOE.Services
 {
-    // Validation result class
+    // Validation result class used to hold validation output
     public class ValidationResult
     {
-        public bool IsValid { get; set; }
-        public List<string> Errors { get; set; } = new List<string>();
-        public List<string> Warnings { get; set; } = new List<string>();
-        public string RecommendedAction { get; set; } = "Approve";
-        public int RiskScore { get; set; } = 0; // 0-100
+        public bool IsValid { get; set; } // Indicates if the claim passed validation
+        public List<string> Errors { get; set; } = new List<string>(); // Critical validation errors
+        public List<string> Warnings { get; set; } = new List<string>(); // Non-critical warnings
+        public string RecommendedAction { get; set; } = "Approve"; // Suggested next step based on risk
+        public int RiskScore { get; set; } = 0; // Risk score (0–100 scale)
     }
 
-    // Interface for claim validation
+    // Interface defining validation methods
     public interface IClaimValidationService
     {
-        ValidationResult ValidateClaim(Claim claim);
-        ValidationResult AutoVerifyClaim(Claim claim);
-        bool MeetsApprovalCriteria(Claim claim);
+        ValidationResult ValidateClaim(Claim claim); // Performs full validation
+        ValidationResult AutoVerifyClaim(Claim claim); // Validation done during submission
+        bool MeetsApprovalCriteria(Claim claim); // Determines if claim can auto-approve
     }
 
-    // Automated claim validation service
+    // Implementation of the validation logic
     public class ClaimValidationService : IClaimValidationService
     {
-        private readonly ILogger<ClaimValidationService> _logger;
-        private readonly ApplicationDbContext _context;
+        private readonly ILogger<ClaimValidationService> _logger; // For logging validation results
+        private readonly ApplicationDbContext _context; // Database context
 
-        // Policy rules (can be moved to database/config)
-        private const decimal MAX_HOURS_PER_MONTH = 744m;
-        private const decimal MIN_HOURS_PER_MONTH = 0.1m;
-        private const decimal MAX_HOURLY_RATE = 9999.99m;
-        private const decimal MIN_HOURLY_RATE = 1m;
-        private const decimal STANDARD_RATE = 450m;
-        private const decimal HIGH_HOURS_THRESHOLD = 200m; // Flag if over 200 hours
-        private const decimal HIGH_AMOUNT_THRESHOLD = 100000m; // Flag if over R100k
-        private const int REQUIRED_DOCUMENTS = 1; // Minimum documents required
+        // Policy limits and thresholds
+        private const decimal MAX_HOURS_PER_MONTH = 744m; // Max hours in a month
+        private const decimal MIN_HOURS_PER_MONTH = 0.1m; // Minimum allowed hours
+        private const decimal MAX_HOURLY_RATE = 9999.99m; // Max allowed hourly rate
+        private const decimal MIN_HOURLY_RATE = 1m; // Minimum allowed hourly rate
+        private const decimal STANDARD_RATE = 450m; // Typical lecturer hourly rate
+        private const decimal HIGH_HOURS_THRESHOLD = 200m; // Warning threshold
+        private const decimal HIGH_AMOUNT_THRESHOLD = 100000m; // High-value claim threshold
+        private const int REQUIRED_DOCUMENTS = 1; // Minimum documents for approval
 
+        // Constructor injecting database context and logger
         public ClaimValidationService(ApplicationDbContext context, ILogger<ClaimValidationService> logger)
         {
             _context = context;
             _logger = logger;
         }
 
-        // Comprehensive claim validation
+        // Main claim validation logic
         public ValidationResult ValidateClaim(Claim claim)
         {
             var result = new ValidationResult { IsValid = true };
 
             try
             {
-                // 1. Validate Hours Worked
+                // 1. Validate claimed hours
                 if (claim.HoursWorked < MIN_HOURS_PER_MONTH)
                 {
                     result.Errors.Add($"Hours worked ({claim.HoursWorked}) is below minimum ({MIN_HOURS_PER_MONTH})");
@@ -63,7 +64,7 @@ namespace ProgPOE.Services
                     result.IsValid = false;
                 }
 
-                // 2. Validate Hourly Rate
+                // 2. Validate hourly rate
                 if (claim.HourlyRate < MIN_HOURLY_RATE)
                 {
                     result.Errors.Add($"Hourly rate (R{claim.HourlyRate}) is below minimum (R{MIN_HOURLY_RATE})");
@@ -76,7 +77,7 @@ namespace ProgPOE.Services
                     result.IsValid = false;
                 }
 
-                // 3. Check against lecturer's default rate
+                // 3. Compare with lecturer's default rate
                 var lecturer = _context.Users.Find(claim.LecturerId);
                 if (lecturer != null && lecturer.DefaultHourlyRate.HasValue)
                 {
@@ -87,21 +88,21 @@ namespace ProgPOE.Services
                     }
                 }
 
-                // 4. High hours warning
+                // 4. Warn for unusually high hours
                 if (claim.HoursWorked > HIGH_HOURS_THRESHOLD)
                 {
                     result.Warnings.Add($"High hours claimed ({claim.HoursWorked} hours). Please verify timesheet.");
                     result.RiskScore += 15;
                 }
 
-                // 5. High amount warning
+                // 5. Warn for high-value claims
                 if (claim.TotalAmount > HIGH_AMOUNT_THRESHOLD)
                 {
                     result.Warnings.Add($"High total amount (R{claim.TotalAmount:N2}). Requires additional verification.");
                     result.RiskScore += 25;
                 }
 
-                // 6. Document validation
+                // 6. Validate supporting documents
                 var documentCount = _context.SupportingDocuments
                     .Count(d => d.ClaimId == claim.ClaimId && d.IsActive);
 
@@ -111,7 +112,7 @@ namespace ProgPOE.Services
                     result.RiskScore += 10;
                 }
 
-                // 7. Check for duplicate claims (same month/year)
+                // 7. Detect duplicate claim for same lecturer and month
                 var duplicateClaim = _context.Claims
                     .Any(c => c.LecturerId == claim.LecturerId
                            && c.MonthYear == claim.MonthYear
@@ -125,7 +126,7 @@ namespace ProgPOE.Services
                     result.RiskScore += 50;
                 }
 
-                // 8. Determine recommended action based on risk score
+                // 8. Determine recommended action using risk score
                 if (result.RiskScore >= 50)
                 {
                     result.RecommendedAction = "Manual Review Required";
@@ -143,10 +144,12 @@ namespace ProgPOE.Services
                     result.RecommendedAction = "Auto-Approve";
                 }
 
+                // Log final decision
                 _logger.LogInformation($"Claim {claim.ClaimId} validation: IsValid={result.IsValid}, RiskScore={result.RiskScore}, Action={result.RecommendedAction}");
             }
             catch (Exception ex)
             {
+                // Log and return system-level error
                 _logger.LogError(ex, $"Error validating claim {claim.ClaimId}");
                 result.Errors.Add("System error during validation");
                 result.IsValid = false;
@@ -155,25 +158,25 @@ namespace ProgPOE.Services
             return result;
         }
 
-        // Auto-verify claim (called on submission)
+        // Additional verification during submission
         public ValidationResult AutoVerifyClaim(Claim claim)
         {
             var result = ValidateClaim(claim);
 
-            // Add submission-specific checks
+            // Date-based checks
             if (!string.IsNullOrEmpty(claim.MonthYear))
             {
                 var claimDate = DateTime.Parse(claim.MonthYear + "-01");
                 var currentDate = DateTime.Now;
 
-                // Can't claim for future months
+                // Disallow future claims
                 if (claimDate > currentDate)
                 {
                     result.Errors.Add("Cannot submit claims for future months");
                     result.IsValid = false;
                 }
 
-                // Warn if claiming for more than 3 months ago
+                // Warn for claims older than 3 months
                 if (claimDate < currentDate.AddMonths(-3))
                 {
                     result.Warnings.Add("Claim is for more than 3 months ago. May require additional justification.");
@@ -184,33 +187,32 @@ namespace ProgPOE.Services
             return result;
         }
 
-        // Check if claim meets auto-approval criteria
+        // Evaluates whether claim can be automatically approved
         public bool MeetsApprovalCriteria(Claim claim)
         {
             var result = ValidateClaim(claim);
 
-            // Auto-approve criteria:
-            // 1. No errors
-            // 2. Risk score below 30
-            // 3. Has supporting documents
-            // 4. Amount within reasonable limits
-
+            // Conditions for auto-approval:
+            // Must have no errors
             if (!result.IsValid)
                 return false;
 
+            // Risk score must be under threshold
             if (result.RiskScore >= 30)
                 return false;
 
+            // Must have supporting docs
             var documentCount = _context.SupportingDocuments
                 .Count(d => d.ClaimId == claim.ClaimId && d.IsActive);
 
             if (documentCount < REQUIRED_DOCUMENTS)
                 return false;
 
+            // High amount claims require manual review
             if (claim.TotalAmount > HIGH_AMOUNT_THRESHOLD)
                 return false;
 
-            return true;
+            return true; // Passed all auto-approval criteria
         }
     }
 }

@@ -4,16 +4,16 @@ using ProgPOE.Models;
 
 namespace ProgPOE.Services
 {
-    // Workflow decision result
+    // Represents the result of a workflow action (approve, reject, return)
     public class WorkflowDecision
     {
-        public bool Success { get; set; }
-        public string Message { get; set; }
-        public ClaimStatus NewStatus { get; set; }
-        public List<string> Notifications { get; set; } = new List<string>();
+        public bool Success { get; set; }                  // Whether the workflow action completed successfully
+        public string Message { get; set; }               // Message to show to the user
+        public ClaimStatus NewStatus { get; set; }        // Updated claim status
+        public List<string> Notifications { get; set; } = new List<string>(); // Notifications to send
     }
 
-    // Interface for approval workflow
+    // Interface defining the approval workflow operations
     public interface IApprovalWorkflowService
     {
         Task<WorkflowDecision> ProcessWorkflowAsync(int claimId, ApprovalAction action, int approverId, string comments);
@@ -21,7 +21,7 @@ namespace ProgPOE.Services
         Task<bool> CanApproveClaimAsync(int claimId, int approverId, UserRole role);
     }
 
-    // Automated approval workflow service
+    // Handles the automated approval workflow for claims
     public class ApprovalWorkflowService : IApprovalWorkflowService
     {
         private readonly ApplicationDbContext _context;
@@ -38,7 +38,7 @@ namespace ProgPOE.Services
             _logger = logger;
         }
 
-        // Process approval workflow with automated checks
+        // Main workflow processor (Approve, Reject, Return)
         public async Task<WorkflowDecision> ProcessWorkflowAsync(
             int claimId,
             ApprovalAction action,
@@ -49,6 +49,7 @@ namespace ProgPOE.Services
 
             try
             {
+                // Load claim with lecturer details
                 var claim = await _context.Claims
                     .Include(c => c.Lecturer)
                     .FirstOrDefaultAsync(c => c.ClaimId == claimId);
@@ -59,6 +60,7 @@ namespace ProgPOE.Services
                     return decision;
                 }
 
+                // Load approver
                 var approver = await _context.Users.FindAsync(approverId);
                 if (approver == null)
                 {
@@ -66,19 +68,19 @@ namespace ProgPOE.Services
                     return decision;
                 }
 
-                // Check if approver has permission
+                // Check permission for this approver
                 if (!await CanApproveClaimAsync(claimId, approverId, approver.Role))
                 {
                     decision.Message = "You don't have permission to approve this claim";
                     return decision;
                 }
 
-                // Run automated validation
+                // Run validation rules on the claim
                 var validation = _validationService.ValidateClaim(claim);
 
                 _logger.LogInformation($"Processing workflow for Claim {claimId} by {approver.FullName} ({approver.Role}): Action={action}");
 
-                // Process based on action and role
+                // Route action to appropriate internal method
                 switch (action)
                 {
                     case ApprovalAction.Approve:
@@ -94,6 +96,7 @@ namespace ProgPOE.Services
                         break;
                 }
 
+                // Save changes if action succeeded
                 if (decision.Success)
                 {
                     await _context.SaveChangesAsync();
@@ -109,7 +112,7 @@ namespace ProgPOE.Services
             return decision;
         }
 
-        // Process approval action
+        // Handles approval logic for both Coordinator and Academic Manager
         private async Task<WorkflowDecision> ProcessApprovalAsync(
             Claim claim,
             User approver,
@@ -118,7 +121,7 @@ namespace ProgPOE.Services
         {
             var decision = new WorkflowDecision { Success = true };
 
-            // Add validation warnings to comments
+            // Append validation warnings to comments when approving
             var fullComments = comments;
             if (validation.Warnings.Any())
             {
@@ -128,7 +131,7 @@ namespace ProgPOE.Services
 
             if (approver.Role == UserRole.ProgrammeCoordinator)
             {
-                // Coordinator approval
+                // First level approval → forwards claim to manager
                 claim.Status = ClaimStatus.PendingManager;
                 claim.CoordinatorApprovalDate = DateTime.Now;
                 claim.CoordinatorNotes = string.IsNullOrEmpty(fullComments)
@@ -143,7 +146,7 @@ namespace ProgPOE.Services
             }
             else if (approver.Role == UserRole.AcademicManager)
             {
-                // Manager approval - final approval
+                // Final approval
                 claim.Status = ClaimStatus.Approved;
                 claim.ManagerApprovalDate = DateTime.Now;
                 claim.ManagerNotes = string.IsNullOrEmpty(fullComments)
@@ -160,7 +163,7 @@ namespace ProgPOE.Services
             return decision;
         }
 
-        // Process rejection
+        // Handles claim rejection for both roles
         private async Task<WorkflowDecision> ProcessRejectionAsync(
             Claim claim,
             User approver,
@@ -175,6 +178,7 @@ namespace ProgPOE.Services
 
             claim.Status = ClaimStatus.Rejected;
 
+            // Save rejection comments depending on role
             if (approver.Role == UserRole.ProgrammeCoordinator)
             {
                 claim.CoordinatorNotes = string.IsNullOrEmpty(comments)
@@ -197,7 +201,7 @@ namespace ProgPOE.Services
             return decision;
         }
 
-        // Process return for revision
+        // Handles returning a claim for revision
         private async Task<WorkflowDecision> ProcessReturnAsync(
             Claim claim,
             User approver,
@@ -212,6 +216,7 @@ namespace ProgPOE.Services
 
             claim.Status = ClaimStatus.Returned;
 
+            // Save return notes depending on role
             if (approver.Role == UserRole.ProgrammeCoordinator)
             {
                 claim.CoordinatorNotes = string.IsNullOrEmpty(comments)
@@ -234,7 +239,7 @@ namespace ProgPOE.Services
             return decision;
         }
 
-        // Get claims that an approver can review
+        // Returns all claims that an approver can see depending on their role
         public async Task<List<Claim>> GetClaimsForApproverAsync(int approverId, UserRole role)
         {
             var query = _context.Claims
@@ -244,12 +249,12 @@ namespace ProgPOE.Services
 
             if (role == UserRole.ProgrammeCoordinator)
             {
-                // Coordinators see claims pending their review
+                // Coordinators view claims in "Pending" status
                 query = query.Where(c => c.Status == ClaimStatus.Pending);
             }
             else if (role == UserRole.AcademicManager)
             {
-                // Managers see claims pending their approval
+                // Managers view claims forwarded from Coordinator
                 query = query.Where(c => c.Status == ClaimStatus.PendingManager);
             }
 
@@ -258,21 +263,21 @@ namespace ProgPOE.Services
                 .ToListAsync();
         }
 
-        // Check if user can approve a claim
+        // Checks whether the given user has permission to approve the given claim
         public async Task<bool> CanApproveClaimAsync(int claimId, int approverId, UserRole role)
         {
             var claim = await _context.Claims.FindAsync(claimId);
             if (claim == null) return false;
 
-            // Coordinators can only approve pending claims
+            // Coordinator permission check
             if (role == UserRole.ProgrammeCoordinator && claim.Status != ClaimStatus.Pending)
                 return false;
 
-            // Managers can only approve claims pending manager review
+            // Manager permission check
             if (role == UserRole.AcademicManager && claim.Status != ClaimStatus.PendingManager)
                 return false;
 
-            // Lecturers cannot approve
+            // Lecturers cannot approve any claim
             if (role == UserRole.Lecturer)
                 return false;
 

@@ -9,6 +9,7 @@ namespace ProgPOE.Controllers
 {
     public class HRController : Controller
     {
+        // Inject required services: HR Service, DB Context, and Logger
         private readonly IHRService _hrService;
         private readonly ApplicationDbContext _context;
         private readonly ILogger<HRController> _logger;
@@ -23,18 +24,19 @@ namespace ProgPOE.Controllers
             _logger = logger;
         }
 
-        // GET: HR/Dashboard
+        // HR Dashboard page
         public async Task<IActionResult> Dashboard()
         {
             try
             {
-                // Check if user is HR
+                // Only allow HR users
                 if (!IsHRUser())
                 {
                     TempData["Error"] = "Access denied. HR access only.";
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Load dashboard data
                 var dashboard = await _hrService.GetDashboardDataAsync();
                 ViewBag.CurrentUser = GetCurrentUserInfo();
 
@@ -48,7 +50,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // GET: HR/ManageLecturers
+        // List all lecturers
         public async Task<IActionResult> ManageLecturers()
         {
             try
@@ -59,6 +61,7 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Load lecturers from service
                 var lecturers = await _hrService.GetAllLecturersAsync();
                 ViewBag.CurrentUser = GetCurrentUserInfo();
 
@@ -72,7 +75,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // GET: HR/CreateLecturer
+        // Page to create a new lecturer
         public IActionResult CreateLecturer()
         {
             if (!IsHRUser())
@@ -81,6 +84,7 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
+            // Default model values
             var model = new ManageLecturerViewModel
             {
                 IsActive = true,
@@ -91,7 +95,7 @@ namespace ProgPOE.Controllers
             return View(model);
         }
 
-        // POST: HR/CreateLecturer
+        // Save new lecturer
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> CreateLecturer(ManageLecturerViewModel model)
@@ -104,12 +108,14 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Validate form
                 if (!ModelState.IsValid)
                 {
                     ViewBag.CurrentUser = GetCurrentUserInfo();
                     return View(model);
                 }
 
+                // Attempt to create lecturer
                 var result = await _hrService.CreateLecturerAsync(model);
 
                 if (result)
@@ -119,6 +125,7 @@ namespace ProgPOE.Controllers
                 }
                 else
                 {
+                    // Username/email conflict
                     TempData["Error"] = "Username or email already exists. Please use different credentials.";
                     ViewBag.CurrentUser = GetCurrentUserInfo();
                     return View(model);
@@ -133,7 +140,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // GET: HR/EditLecturer/5
+        // Load lecturer details for editing
         public async Task<IActionResult> EditLecturer(int id)
         {
             try
@@ -144,6 +151,7 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Get lecturer by ID
                 var lecturer = await _hrService.GetLecturerByIdAsync(id);
                 if (lecturer == null)
                 {
@@ -151,6 +159,7 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("ManageLecturers");
                 }
 
+                // Fill ViewModel
                 var model = new ManageLecturerViewModel
                 {
                     UserId = lecturer.UserId,
@@ -174,7 +183,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // POST: HR/EditLecturer
+        // Save lecturer updates
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> EditLecturer(ManageLecturerViewModel model)
@@ -187,12 +196,14 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Validate input
                 if (!ModelState.IsValid)
                 {
                     ViewBag.CurrentUser = GetCurrentUserInfo();
                     return View(model);
                 }
 
+                // Update lecturer via service
                 var result = await _hrService.UpdateLecturerAsync(model);
 
                 if (result)
@@ -216,7 +227,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // POST: HR/DeactivateLecturer
+        // Deactivate lecturer
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeactivateLecturer(int id)
@@ -229,16 +240,11 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Deactivate lecturer
                 var result = await _hrService.DeactivateLecturerAsync(id);
 
-                if (result)
-                {
-                    TempData["Success"] = "Lecturer deactivated successfully.";
-                }
-                else
-                {
-                    TempData["Error"] = "Error deactivating lecturer.";
-                }
+                TempData[result ? "Success" : "Error"] =
+                    result ? "Lecturer deactivated successfully." : "Error deactivating lecturer.";
 
                 return RedirectToAction("ManageLecturers");
             }
@@ -250,7 +256,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // POST: HR/ActivateLecturer
+        // Activate lecturer
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ActivateLecturer(int id)
@@ -265,14 +271,8 @@ namespace ProgPOE.Controllers
 
                 var result = await _hrService.ActivateLecturerAsync(id);
 
-                if (result)
-                {
-                    TempData["Success"] = "Lecturer activated successfully.";
-                }
-                else
-                {
-                    TempData["Error"] = "Error activating lecturer.";
-                }
+                TempData[result ? "Success" : "Error"] =
+                    result ? "Lecturer activated successfully." : "Error activating lecturer.";
 
                 return RedirectToAction("ManageLecturers");
             }
@@ -284,7 +284,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // GET: HR/Reports
+        // Load report filters page
         public IActionResult Reports()
         {
             if (!IsHRUser())
@@ -293,6 +293,7 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
+            // Preload default dates
             var model = new GenerateReportViewModel
             {
                 StartDate = DateTime.Now.AddMonths(-1),
@@ -301,14 +302,14 @@ namespace ProgPOE.Controllers
 
             ViewBag.CurrentUser = GetCurrentUserInfo();
 
-            // Get lecturers for dropdown
+            // Lecturer dropdown list
             ViewBag.Lecturers = _context.Users
                 .Where(u => u.Role == UserRole.Lecturer)
                 .OrderBy(u => u.LastName)
                 .Select(u => new { u.UserId, FullName = u.FirstName + " " + u.LastName })
                 .ToList();
 
-            // Get departments for dropdown
+            // Department dropdown
             ViewBag.Departments = _context.Users
                 .Where(u => u.Role == UserRole.Lecturer && !string.IsNullOrEmpty(u.Department))
                 .Select(u => u.Department)
@@ -319,7 +320,7 @@ namespace ProgPOE.Controllers
             return View(model);
         }
 
-        // POST: HR/GenerateReport
+        // Handle report generation request
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> GenerateReport(GenerateReportViewModel model)
@@ -332,8 +333,10 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Index", "Home");
                 }
 
+                // Log report request
                 _logger.LogInformation($"Generating report: Type={model.ReportType}");
 
+                // Redirect to the correct report generator
                 switch (model.ReportType)
                 {
                     case ReportType.ApprovedClaimsSummary:
@@ -364,9 +367,10 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // Generate Approved Claims Summary CSV
+        // Generate Approved Claims Summary CSV file
         private async Task<IActionResult> GenerateApprovedClaimsSummaryReport(GenerateReportViewModel model)
         {
+            // Get claims based on filters
             var claims = await _hrService.GetApprovedClaimsForReportAsync(
                 model.StartDate,
                 model.EndDate,
@@ -381,6 +385,7 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Reports");
             }
 
+            // Build CSV
             var csv = new StringBuilder();
             csv.AppendLine("Claim ID,Lecturer,Department,Period,Hours,Rate,Total Amount,Submission Date,Approval Date");
 
@@ -403,7 +408,7 @@ namespace ProgPOE.Controllers
             return File(bytes, "text/csv", fileName);
         }
 
-        // Generate Lecturer Payment Report CSV
+        // Generate Lecturer Payment Summary CSV
         private async Task<IActionResult> GenerateLecturerPaymentReportFile(GenerateReportViewModel model)
         {
             var summaries = await _hrService.GetLecturerPaymentSummariesAsync(model.StartDate, model.EndDate);
@@ -416,6 +421,7 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Reports");
             }
 
+            // Create CSV structure
             var csv = new StringBuilder();
             csv.AppendLine("Lecturer,Email,Department,Total Claims,Approved Claims,Total Earnings,Last Claim Date,Status");
 
@@ -437,9 +443,10 @@ namespace ProgPOE.Controllers
             return File(bytes, "text/csv", fileName);
         }
 
-        // Generate Monthly Claim Report
+        // Generate monthly grouped claims report CSV
         private async Task<IActionResult> GenerateMonthlyClaimReportFile(GenerateReportViewModel model)
         {
+            // Load approved claims
             var claims = await _context.Claims
                 .Include(c => c.Lecturer)
                 .Where(c => c.Status == ClaimStatus.Approved)
@@ -447,6 +454,7 @@ namespace ProgPOE.Controllers
 
             _logger.LogInformation($"Found {claims.Count} total approved claims");
 
+            // Apply optional date filters
             if (model.StartDate.HasValue)
                 claims = claims.Where(c => c.SubmissionDate >= model.StartDate.Value).ToList();
 
@@ -461,10 +469,12 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Reports");
             }
 
+            // Group by month
             var groupedByMonth = claims
                 .GroupBy(c => c.MonthYear)
                 .OrderBy(g => g.Key);
 
+            // Create CSV
             var csv = new StringBuilder();
             csv.AppendLine("Period,Total Claims,Total Hours,Total Amount Paid");
 
@@ -482,7 +492,7 @@ namespace ProgPOE.Controllers
             return File(bytes, "text/csv", fileName);
         }
 
-        // Generate Lecturer Directory
+        // Generate lecturer directory CSV
         private async Task<IActionResult> GenerateLecturerDirectoryFile()
         {
             var lecturers = await _hrService.GetAllLecturersAsync();
@@ -515,7 +525,7 @@ namespace ProgPOE.Controllers
             return File(bytes, "text/csv", fileName);
         }
 
-        // Generate Payment Invoice
+        // Generate and display a payment invoice HTML View
         private async Task<IActionResult> GeneratePaymentInvoicePage(GenerateReportViewModel model)
         {
             if (!model.LecturerId.HasValue)
@@ -524,7 +534,7 @@ namespace ProgPOE.Controllers
                 return RedirectToAction("Reports");
             }
 
-            // Use the MonthYear from StartDate if provided, otherwise current month
+            // Use StartDate's month OR use current month
             var period = model.StartDate?.ToString("yyyy-MM") ?? DateTime.Now.ToString("yyyy-MM");
 
             _logger.LogInformation($"Generating invoice for Lecturer {model.LecturerId}, Period {period}");
@@ -542,14 +552,14 @@ namespace ProgPOE.Controllers
             return View("Invoice", invoice);
         }
 
-        // Helper: Check if current user is HR
+        // Check if logged-in user is HR
         private bool IsHRUser()
         {
             var roleString = HttpContext.Session.GetString("UserRole");
             return roleString == "HR";
         }
 
-        // Helper: Get current user info
+        // Retrieve current logged-in user's information from session
         private object GetCurrentUserInfo()
         {
             var userId = HttpContext.Session.GetInt32("UserId") ?? 4;

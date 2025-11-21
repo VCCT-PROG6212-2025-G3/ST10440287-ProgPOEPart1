@@ -4,25 +4,47 @@ using ProgPOE.Models;
 
 namespace ProgPOE.Services
 {
-    // Interface for HR operations
+    // Interface defining all HR-related service operations
     public interface IHRService
     {
+        // Fetch HR dashboard statistics and recent activities
         Task<HRDashboardViewModel> GetDashboardDataAsync();
+
+        // Get a list of all lecturers in the system
         Task<List<User>> GetAllLecturersAsync();
+
+        // Get a specific lecturer by their ID
         Task<User> GetLecturerByIdAsync(int lecturerId);
+
+        // Create a new lecturer based on ViewModel input
         Task<bool> CreateLecturerAsync(ManageLecturerViewModel model);
+
+        // Update an existing lecturer's basic details
         Task<bool> UpdateLecturerAsync(ManageLecturerViewModel model);
+
+        // Mark a lecturer as inactive (soft delete)
         Task<bool> DeactivateLecturerAsync(int lecturerId);
+
+        // Reactivate a previously deactivated lecturer
         Task<bool> ActivateLecturerAsync(int lecturerId);
+
+        // Generate high-level summaries of lecturer payments
         Task<List<LecturerPaymentSummary>> GetLecturerPaymentSummariesAsync(DateTime? startDate, DateTime? endDate);
+
+        // Create a detailed payment invoice for a specific lecturer + month
         Task<PaymentInvoiceViewModel> GeneratePaymentInvoiceAsync(int lecturerId, string period);
+
+        // Get a filtered list of approved claims for reporting purposes
         Task<List<Claim>> GetApprovedClaimsForReportAsync(DateTime? startDate, DateTime? endDate, int? lecturerId, string department);
     }
 
-    // HR Service Implementation
+    // Implementation of the HR service operations
     public class HRService : IHRService
     {
+        // Database context used for all queries
         private readonly ApplicationDbContext _context;
+
+        // Logger service for recording system events and errors
         private readonly ILogger<HRService> _logger;
 
         public HRService(ApplicationDbContext context, ILogger<HRService> logger)
@@ -31,28 +53,45 @@ namespace ProgPOE.Services
             _logger = logger;
         }
 
-        // Get HR Dashboard Data
+        // Fetch dashboard statistics and recent lecturer/claim activity
         public async Task<HRDashboardViewModel> GetDashboardDataAsync()
         {
             try
             {
+                // Format used for Month-Year (example: "2025-11")
                 var currentMonth = DateTime.Now.ToString("yyyy-MM");
 
+                // Build dashboard data model with multiple queries
                 var dashboard = new HRDashboardViewModel
                 {
+                    // Count all lecturers
                     TotalLecturers = await _context.Users.CountAsync(u => u.Role == UserRole.Lecturer),
+
+                    // Count active lecturers
                     ActiveLecturers = await _context.Users.CountAsync(u => u.Role == UserRole.Lecturer && u.IsActive),
+
+                    // Count inactive lecturers
                     InactiveLecturers = await _context.Users.CountAsync(u => u.Role == UserRole.Lecturer && !u.IsActive),
+
+                    // Count this month's claims
                     TotalClaimsThisMonth = await _context.Claims.CountAsync(c => c.MonthYear == currentMonth),
+
+                    // Count approved claims for this month
                     ApprovedClaimsThisMonth = await _context.Claims.CountAsync(c => c.MonthYear == currentMonth && c.Status == ClaimStatus.Approved),
+
+                    // Sum total approved payments for this month
                     TotalPaymentsThisMonth = await _context.Claims
                         .Where(c => c.MonthYear == currentMonth && c.Status == ClaimStatus.Approved)
                         .SumAsync(c => c.TotalAmount),
+
+                    // Show 5 most recently created lecturers
                     RecentLecturers = await _context.Users
                         .Where(u => u.Role == UserRole.Lecturer)
                         .OrderByDescending(u => u.CreatedDate)
                         .Take(5)
                         .ToListAsync(),
+
+                    // Show 10 most recent approved claims
                     RecentApprovedClaims = await _context.Claims
                         .Include(c => c.Lecturer)
                         .Where(c => c.Status == ClaimStatus.Approved)
@@ -65,12 +104,13 @@ namespace ProgPOE.Services
             }
             catch (Exception ex)
             {
+                // Log error and return empty dashboard object
                 _logger.LogError(ex, "Error getting HR dashboard data");
                 return new HRDashboardViewModel();
             }
         }
 
-        // Get all lecturers
+        // Retrieve a sorted list of all lecturers
         public async Task<List<User>> GetAllLecturersAsync()
         {
             return await _context.Users
@@ -80,19 +120,19 @@ namespace ProgPOE.Services
                 .ToListAsync();
         }
 
-        // Get lecturer by ID
+        // Find a lecturer based on their unique user ID
         public async Task<User> GetLecturerByIdAsync(int lecturerId)
         {
             return await _context.Users
                 .FirstOrDefaultAsync(u => u.UserId == lecturerId && u.Role == UserRole.Lecturer);
         }
 
-        // Create new lecturer
+        // Create a new lecturer in the system
         public async Task<bool> CreateLecturerAsync(ManageLecturerViewModel model)
         {
             try
             {
-                // Check if username or email already exists
+                // Prevent duplicate username/email
                 var existingUser = await _context.Users
                     .AnyAsync(u => u.Username == model.Username || u.Email == model.Email);
 
@@ -102,6 +142,7 @@ namespace ProgPOE.Services
                     return false;
                 }
 
+                // Map ViewModel values to User entity
                 var lecturer = new User
                 {
                     Username = model.Username,
@@ -128,11 +169,12 @@ namespace ProgPOE.Services
             }
         }
 
-        // Update existing lecturer
+        // Update existing lecturer profile
         public async Task<bool> UpdateLecturerAsync(ManageLecturerViewModel model)
         {
             try
             {
+                // Ensure the lecturer exists
                 var lecturer = await _context.Users.FindAsync(model.UserId);
                 if (lecturer == null || lecturer.Role != UserRole.Lecturer)
                 {
@@ -140,7 +182,7 @@ namespace ProgPOE.Services
                     return false;
                 }
 
-                // Check if username/email conflict with other users
+                // Prevent email/username conflicts with other users
                 var conflict = await _context.Users
                     .AnyAsync(u => u.UserId != model.UserId &&
                              (u.Username == model.Username || u.Email == model.Email));
@@ -151,6 +193,7 @@ namespace ProgPOE.Services
                     return false;
                 }
 
+                // Apply updates
                 lecturer.Username = model.Username;
                 lecturer.Email = model.Email;
                 lecturer.FirstName = model.FirstName;
@@ -171,7 +214,7 @@ namespace ProgPOE.Services
             }
         }
 
-        // Deactivate lecturer
+        // Mark a lecturer as inactive (soft delete)
         public async Task<bool> DeactivateLecturerAsync(int lecturerId)
         {
             try
@@ -193,7 +236,7 @@ namespace ProgPOE.Services
             }
         }
 
-        // Activate lecturer
+        // Reactivate a previously inactive lecturer
         public async Task<bool> ActivateLecturerAsync(int lecturerId)
         {
             try
@@ -215,16 +258,18 @@ namespace ProgPOE.Services
             }
         }
 
-        // Get lecturer payment summaries
+        // Retrieve earnings + claim summary for all lecturers
         public async Task<List<LecturerPaymentSummary>> GetLecturerPaymentSummariesAsync(DateTime? startDate, DateTime? endDate)
         {
             try
             {
+                // Start by selecting all lecturers including their claims
                 var query = _context.Users
                     .Where(u => u.Role == UserRole.Lecturer)
                     .Include(u => u.Claims)
                     .AsQueryable();
 
+                // Build summary objects from the data
                 var summaries = await query.Select(u => new LecturerPaymentSummary
                 {
                     Lecturer = u,
@@ -234,6 +279,7 @@ namespace ProgPOE.Services
                     LastClaimDate = u.Claims.OrderByDescending(c => c.SubmissionDate).Select(c => c.SubmissionDate).FirstOrDefault()
                 }).ToListAsync();
 
+                // Sort by highest earnings
                 return summaries.OrderByDescending(s => s.TotalEarnings).ToList();
             }
             catch (Exception ex)
@@ -243,15 +289,17 @@ namespace ProgPOE.Services
             }
         }
 
-        // Generate payment invoice
+        // Creates a payment invoice containing all approved claims for a lecturer for a given month
         public async Task<PaymentInvoiceViewModel> GeneratePaymentInvoiceAsync(int lecturerId, string period)
         {
             try
             {
+                // Ensure lecturer exists
                 var lecturer = await _context.Users.FindAsync(lecturerId);
                 if (lecturer == null)
                     return null;
 
+                // Get all approved claims from the specified period
                 var claims = await _context.Claims
                     .Include(c => c.Documents)
                     .Where(c => c.LecturerId == lecturerId &&
@@ -259,6 +307,7 @@ namespace ProgPOE.Services
                                c.Status == ClaimStatus.Approved)
                     .ToListAsync();
 
+                // Build invoice object
                 var invoice = new PaymentInvoiceViewModel
                 {
                     InvoiceNumber = $"INV-{DateTime.Now:yyyyMMdd}-{lecturerId:D4}",
@@ -278,7 +327,7 @@ namespace ProgPOE.Services
             }
         }
 
-        // Get approved claims for reports
+        // Retrieve approved claims filtered by optional parameters
         public async Task<List<Claim>> GetApprovedClaimsForReportAsync(
             DateTime? startDate,
             DateTime? endDate,
@@ -287,24 +336,30 @@ namespace ProgPOE.Services
         {
             try
             {
+                // Base query: only approved claims
                 var query = _context.Claims
                     .Include(c => c.Lecturer)
                     .Include(c => c.Documents)
                     .Where(c => c.Status == ClaimStatus.Approved)
                     .AsQueryable();
 
+                // Filter by lecturer
                 if (lecturerId.HasValue)
                     query = query.Where(c => c.LecturerId == lecturerId.Value);
 
+                // Filter by department
                 if (!string.IsNullOrEmpty(department))
                     query = query.Where(c => c.Lecturer.Department == department);
 
+                // Filter by start date
                 if (startDate.HasValue)
                     query = query.Where(c => c.SubmissionDate >= startDate.Value);
 
+                // Filter by end date
                 if (endDate.HasValue)
                     query = query.Where(c => c.SubmissionDate <= endDate.Value);
 
+                // Sort newest first
                 return await query
                     .OrderByDescending(c => c.ManagerApprovalDate)
                     .ToListAsync();
