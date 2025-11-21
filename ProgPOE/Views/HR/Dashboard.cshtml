@@ -1,0 +1,200 @@
+﻿@model ProgPOE.Models.HRDashboardViewModel
+@{
+    ViewData["Title"] = "HR Dashboard";
+}
+
+<style>
+    .hr-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 30px;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        border-radius: 12px;
+        padding: 25px;
+        color: white;
+        margin-bottom: 20px;
+        transition: transform 0.3s ease;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+
+    .quick-action-card {
+        border-radius: 10px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+        .quick-action-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+</style>
+
+<div class="hr-header text-center">
+    <h1 class="display-4">👥 HR Dashboard</h1>
+    <p class="lead">Human Resources Management System</p>
+    <p>Welcome, @ViewBag.CurrentUser.UserName</p>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="stat-card bg-primary text-center">
+            <h2>@Model.TotalLecturers</h2>
+            <p class="mb-0">👥 Total Lecturers</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-success text-center">
+            <h2>@Model.ActiveLecturers</h2>
+            <p class="mb-0">✅ Active Lecturers</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-warning text-center">
+            <h2>@Model.ApprovedClaimsThisMonth</h2>
+            <p class="mb-0">📋 Claims This Month</p>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card bg-info text-center">
+            <h2>R @Model.TotalPaymentsThisMonth.ToString("N2")</h2>
+            <p class="mb-0">💰 Total Payments</p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">⚡ Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <a href="@Url.Action("ManageLecturers")" class="text-decoration-none">
+                            <div class="quick-action-card bg-light">
+                                <div style="font-size: 48px;">👥</div>
+                                <h6 class="mt-2">Manage Lecturers</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="@Url.Action("CreateLecturer")" class="text-decoration-none">
+                            <div class="quick-action-card bg-light">
+                                <div style="font-size: 48px;">➕</div>
+                                <h6 class="mt-2">Add New Lecturer</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="@Url.Action("Reports")" class="text-decoration-none">
+                            <div class="quick-action-card bg-light">
+                                <div style="font-size: 48px;">📊</div>
+                                <h6 class="mt-2">Generate Reports</h6>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <a href="@Url.Action("Index", "Home")" class="text-decoration-none">
+                            <div class="quick-action-card bg-light">
+                                <div style="font-size: 48px;">🏠</div>
+                                <h6 class="mt-2">Home</h6>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Lecturers -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">👥 Recently Added Lecturers</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.RecentLecturers.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var lecturer in Model.RecentLecturers)
+                                {
+                                    <tr>
+                                        <td>@lecturer.FullName</td>
+                                        <td>@lecturer.Department</td>
+                                        <td>R @lecturer.DefaultHourlyRate?.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No recent lecturers</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Approved Claims -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">✅ Recently Approved Claims</h5>
+            </div>
+            <div class="card-body">
+                @if (Model.RecentApprovedClaims.Any())
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Lecturer</th>
+                                    <th>Period</th>
+                                    <th>Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var claim in Model.RecentApprovedClaims.Take(5))
+                                {
+                                    <tr>
+                                        <td>@claim.Lecturer?.FullName</td>
+                                        <td>@claim.MonthYear</td>
+                                        <td>R @claim.TotalAmount.ToString("N2")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else
+                {
+                    <p class="text-muted">No recent approved claims</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>

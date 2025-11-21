@@ -1,0 +1,193 @@
+﻿@model List<ProgPOE.Models.User>
+@{
+    ViewData["Title"] = "Manage Lecturers";
+}
+
+<style>
+    .lecturer-card {
+        transition: all 0.3s ease;
+        margin-bottom: 20px;
+    }
+
+        .lecturer-card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+    .lecturer-status-active {
+        border-left: 5px solid #28a745;
+    }
+
+    .lecturer-status-inactive {
+        border-left: 5px solid #dc3545;
+        opacity: 0.7;
+    }
+</style>
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h2>👥 Manage Lecturers</h2>
+                <p class="mb-0">View, edit, and manage all lecturer accounts</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions Bar -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <a href="@Url.Action("CreateLecturer")" class="btn btn-success btn-lg">
+            ➕ Add New Lecturer
+        </a>
+        <a href="@Url.Action("Dashboard")" class="btn btn-outline-secondary btn-lg">
+            ← Back to Dashboard
+        </a>
+    </div>
+    <div class="col-md-6 text-end">
+        <input type="text" id="searchInput" class="form-control" placeholder="🔍 Search lecturers..." onkeyup="searchLecturers()">
+    </div>
+</div>
+
+<!-- Statistics -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-center bg-light">
+            <div class="card-body">
+                <h3>@Model.Count</h3>
+                <p class="mb-0">Total Lecturers</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center bg-success text-white">
+            <div class="card-body">
+                <h3>@Model.Count(l => l.IsActive)</h3>
+                <p class="mb-0">Active Lecturers</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-center bg-danger text-white">
+            <div class="card-body">
+                <h3>@Model.Count(l => !l.IsActive)</h3>
+                <p class="mb-0">Inactive Lecturers</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lecturers List -->
+<div class="card">
+    <div class="card-header bg-info text-white">
+        <h5 class="mb-0">📋 All Lecturers (@Model.Count)</h5>
+    </div>
+    <div class="card-body">
+        @if (!Model.Any())
+        {
+            <div class="alert alert-info text-center">
+                <h5>No lecturers found</h5>
+                <p class="mb-0">Start by adding a new lecturer.</p>
+            </div>
+        }
+        else
+        {
+            <div id="lecturersList">
+                @foreach (var lecturer in Model.OrderBy(l => l.LastName))
+                {
+                    <div class="card lecturer-card @(lecturer.IsActive ? "lecturer-status-active" : "lecturer-status-inactive")"
+                         data-name="@lecturer.FullName.ToLower()"
+                         data-email="@lecturer.Email.ToLower()"
+                         data-dept="@lecturer.Department?.ToLower()">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-6">
+                                    <h5 class="mb-1">
+                                        <strong>@lecturer.FullName</strong>
+                                        @if (lecturer.IsActive)
+                                        {
+                                            <span class="badge bg-success ms-2">✅ Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-danger ms-2">❌ Inactive</span>
+                                        }
+                                    </h5>
+                                    <p class="text-muted mb-1">
+                                        <strong>📧 Email:</strong> @lecturer.Email
+                                    </p>
+                                    <p class="text-muted mb-1">
+                                        <strong>🏢 Department:</strong> @lecturer.Department
+                                    </p>
+                                    <p class="text-muted mb-0">
+                                        <strong>💵 Default Rate:</strong> R @lecturer.DefaultHourlyRate?.ToString("N2")
+                                    </p>
+                                </div>
+                                <div class="col-md-3">
+                                    <p class="mb-1">
+                                        <strong>📅 Created:</strong><br>
+                                        @lecturer.CreatedDate.ToString("dd MMM yyyy")
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>🆔 User ID:</strong> @lecturer.UserId
+                                    </p>
+                                </div>
+                                <div class="col-md-3 text-end">
+                                    <a href="@Url.Action("EditLecturer", new { id = lecturer.UserId })"
+                                       class="btn btn-primary mb-2 w-100">
+                                        ✏️ Edit
+                                    </a>
+
+                                    @if (lecturer.IsActive)
+                                    {
+                                        <form asp-action="DeactivateLecturer" method="post"
+                                              onsubmit="return confirm('Are you sure you want to deactivate @lecturer.FullName?');"
+                                              class="d-inline w-100">
+                                            <input type="hidden" name="id" value="@lecturer.UserId" />
+                                            <button type="submit" class="btn btn-warning w-100">
+                                                🚫 Deactivate
+                                            </button>
+                                        </form>
+                                    }
+                                    else
+                                    {
+                                        <form asp-action="ActivateLecturer" method="post"
+                                              onsubmit="return confirm('Are you sure you want to activate @lecturer.FullName?');"
+                                              class="d-inline w-100">
+                                            <input type="hidden" name="id" value="@lecturer.UserId" />
+                                            <button type="submit" class="btn btn-success w-100">
+                                                ✅ Activate
+                                            </button>
+                                        </form>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function searchLecturers() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const lecturers = document.querySelectorAll('.lecturer-card');
+
+            lecturers.forEach(lecturer => {
+                const name = lecturer.getAttribute('data-name');
+                const email = lecturer.getAttribute('data-email');
+                const dept = lecturer.getAttribute('data-dept');
+
+                const matches = name.includes(search) ||
+                              email.includes(search) ||
+                              (dept && dept.includes(search));
+
+                lecturer.style.display = matches ? 'block' : 'none';
+            });
+        }
+    </script>
+}

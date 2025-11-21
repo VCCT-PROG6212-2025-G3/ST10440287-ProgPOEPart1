@@ -1,0 +1,162 @@
+﻿@model ProgPOE.Models.GenerateReportViewModel
+@{
+    ViewData["Title"] = "Generate Reports";
+}
+
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <h2>📊 Generate Reports</h2>
+                <p class="mb-0">Create and download various system reports</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Report Options -->
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">📋 Report Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="GenerateReport" method="post">
+
+                    <!-- Report Type Selection -->
+                    <div class="mb-4">
+                        <label asp-for="ReportType" class="form-label fw-bold"></label>
+                        <select asp-for="ReportType" class="form-control form-control-lg" id="reportType" onchange="updateFormFields()">
+                            <option value="@ReportType.ApprovedClaimsSummary">Approved Claims Summary</option>
+                            <option value="@ReportType.LecturerPaymentReport">Lecturer Payment Report</option>
+                            <option value="@ReportType.MonthlyClaimReport">Monthly Claim Report</option>
+                            <option value="@ReportType.LecturerDirectory">Lecturer Directory</option>
+                            <option value="@ReportType.PaymentInvoice">Payment Invoice</option>
+                        </select>
+                    </div>
+
+                    <!-- Date Range Fields -->
+                    <div id="dateFields" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label asp-for="StartDate" class="form-label fw-bold"></label>
+                                <input asp-for="StartDate" class="form-control" type="date" />
+                            </div>
+                            <div class="col-md-6">
+                                <label asp-for="EndDate" class="form-label fw-bold"></label>
+                                <input asp-for="EndDate" class="form-control" type="date" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lecturer Selection -->
+                    <div id="lecturerField" class="mb-4" style="display: none;">
+                        <label asp-for="LecturerId" class="form-label fw-bold"></label>
+                        <select asp-for="LecturerId" class="form-control">
+                            <option value="">-- All Lecturers --</option>
+                            @foreach (var lecturer in ViewBag.Lecturers)
+                            {
+                                <option value="@lecturer.UserId">@lecturer.FullName</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Department Selection -->
+                    <div id="departmentField" class="mb-4" style="display: none;">
+                        <label asp-for="Department" class="form-label fw-bold"></label>
+                        <select asp-for="Department" class="form-control">
+                            <option value="">-- All Departments --</option>
+                            @foreach (var dept in ViewBag.Departments)
+                            {
+                                <option value="@dept">@dept</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Report Description -->
+                    <div class="alert alert-info" id="reportDescription">
+                        <strong>Report Description:</strong>
+                        <p id="descriptionText" class="mb-0 mt-2">
+                            Summary of all approved claims with detailed breakdown.
+                        </p>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-between">
+                        <a href="@Url.Action("Dashboard")" class="btn btn-secondary btn-lg">
+                            ← Back to Dashboard
+                        </a>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            📥 Generate Report
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Report Guidelines -->
+        <div class="card mt-4">
+            <div class="card-header bg-success text-white">
+                <h6 class="mb-0">📖 Report Types Guide</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Approved Claims Summary:</strong> Detailed list of all approved claims with amounts</li>
+                    <li><strong>Lecturer Payment Report:</strong> Summary of payments by lecturer</li>
+                    <li><strong>Monthly Claim Report:</strong> Aggregated claim data by month</li>
+                    <li><strong>Lecturer Directory:</strong> Complete list of all lecturers and their details</li>
+                    <li><strong>Payment Invoice:</strong> Generate invoice for specific lecturer and period</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function updateFormFields() {
+            const reportType = document.getElementById('reportType').value;
+            const dateFields = document.getElementById('dateFields');
+            const lecturerField = document.getElementById('lecturerField');
+            const departmentField = document.getElementById('departmentField');
+            const descriptionText = document.getElementById('descriptionText');
+
+            // Hide all optional fields
+            dateFields.style.display = 'block';
+            lecturerField.style.display = 'none';
+            departmentField.style.display = 'none';
+
+            // Update based on report type
+            switch(reportType) {
+                case '@((int)ReportType.ApprovedClaimsSummary)':
+                    lecturerField.style.display = 'block';
+                    departmentField.style.display = 'block';
+                    descriptionText.textContent = 'Detailed CSV report of all approved claims with lecturer info, hours, rates, and amounts.';
+                    break;
+
+                case '@((int)ReportType.LecturerPaymentReport)':
+                    descriptionText.textContent = 'Summary report showing total payments, claims, and earnings per lecturer.';
+                    break;
+
+                case '@((int)ReportType.MonthlyClaimReport)':
+                    descriptionText.textContent = 'Aggregated report showing total claims, hours, and payments by month.';
+                    break;
+
+                case '@((int)ReportType.LecturerDirectory)':
+                    dateFields.style.display = 'none';
+                    descriptionText.textContent = 'Complete directory of all lecturers with contact info and rates.';
+                    break;
+
+                case '@((int)ReportType.PaymentInvoice)':
+                    lecturerField.style.display = 'block';
+                    descriptionText.textContent = 'Generate a detailed payment invoice for a specific lecturer and period.';
+                    break;
+            }
+        }
+
+        // Initialize on page load
+        updateFormFields();
+    </script>
+}

@@ -1,0 +1,244 @@
+﻿@model ProgPOE.Models.PaymentInvoiceViewModel
+@{
+    ViewData["Title"] = "Payment Invoice";
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <style>
+        body {
+            background: white;
+            padding: 20px;
+        }
+
+        .invoice-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border: 1px solid #ddd;
+        }
+
+        .invoice-header {
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .invoice-title {
+            font-size: 36px;
+            color: #007bff;
+            font-weight: bold;
+        }
+
+        .invoice-details {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+
+        .invoice-table th {
+            background: #007bff;
+            color: white;
+        }
+
+        .invoice-total {
+            background: #28a745;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            padding: 15px;
+            text-align: right;
+        }
+
+        .print-button {
+            margin-bottom: 20px;
+        }
+
+        @@media print {
+            .print-button, .no-print {
+                display: none !important;
+            }
+
+            body {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="invoice-container">
+        <!-- Print Button -->
+        <div class="print-button no-print text-end mb-3">
+            <button onclick="window.print()" class="btn btn-primary btn-lg">
+                🖨️ Print Invoice
+            </button>
+            <a href="@Url.Action("Reports")" class="btn btn-secondary btn-lg">
+                ← Back to Reports
+            </a>
+        </div>
+
+        <!-- Invoice Header -->
+        <div class="invoice-header">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="invoice-title">INVOICE</div>
+                    <p class="text-muted mb-0">Payment Invoice for Monthly Claim</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <h4>University Name</h4>
+                    <p class="mb-0">
+                        Human Resources Department<br>
+                        123 University Road<br>
+                        City, Province, 0000<br>
+                        📧 hr@university.ac.za
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Invoice Info -->
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="invoice-details">
+                    <h6 class="fw-bold">BILL TO:</h6>
+                    <p class="mb-1"><strong>@Model.Lecturer.FullName</strong></p>
+                    <p class="mb-1">📧 @Model.Lecturer.Email</p>
+                    <p class="mb-1">🏢 @Model.Lecturer.Department</p>
+                    <p class="mb-0">🆔 Lecturer ID: @Model.Lecturer.UserId</p>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="invoice-details">
+                    <table class="table table-sm table-borderless mb-0">
+                        <tr>
+                            <td><strong>Invoice Number:</strong></td>
+                            <td class="text-end">@Model.InvoiceNumber</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Invoice Date:</strong></td>
+                            <td class="text-end">@Model.InvoiceDate.ToString("dd MMMM yyyy")</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Period:</strong></td>
+                            <td class="text-end">@Model.Period</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Claims:</strong></td>
+                            <td class="text-end">@Model.Claims.Count</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Claims Details Table -->
+        <h5 class="mb-3">📋 Claim Details</h5>
+        <table class="table table-bordered invoice-table">
+            <thead>
+                <tr>
+                    <th>Claim ID</th>
+                    <th>Period</th>
+                    <th class="text-end">Hours</th>
+                    <th class="text-end">Rate (R)</th>
+                    <th class="text-end">Amount (R)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var claim in Model.Claims)
+                {
+                    <tr>
+                        <td>CL-@claim.ClaimId.ToString("D6")</td>
+                        <td>@claim.MonthYear</td>
+                        <td class="text-end">@claim.HoursWorked.ToString("F1")</td>
+                        <td class="text-end">@claim.HourlyRate.ToString("N2")</td>
+                        <td class="text-end">@claim.TotalAmount.ToString("N2")</td>
+                        <td>
+                            <span class="badge bg-success">@claim.StatusDisplayText</span>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="text-end fw-bold">TOTAL HOURS:</td>
+                    <td class="text-end fw-bold">@Model.Claims.Sum(c => c.HoursWorked).ToString("F1")</td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+
+        <!-- Payment Summary -->
+        <div class="row mt-4">
+            <div class="col-md-6 offset-md-6">
+                <table class="table table-bordered">
+                    <tr>
+                        <td><strong>Subtotal:</strong></td>
+                        <td class="text-end">R @Model.TotalAmount.ToString("N2")</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Tax (0%):</strong></td>
+                        <td class="text-end">R 0.00</td>
+                    </tr>
+                    <tr class="invoice-total">
+                        <td><strong>TOTAL AMOUNT DUE:</strong></td>
+                        <td class="text-end">R @Model.TotalAmount.ToString("N2")</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- Additional Information -->
+        <div class="alert alert-info mt-4">
+            <h6 class="fw-bold">📝 Payment Information:</h6>
+            <ul class="mb-0">
+                <li>Payment will be processed within 5-7 business days</li>
+                <li>Funds will be deposited directly to your registered bank account</li>
+                <li>Please retain this invoice for your records</li>
+                <li>For queries, contact HR at hr@university.ac.za</li>
+            </ul>
+        </div>
+
+        <!-- Documents Attached -->
+        @if (Model.Claims.Any(c => c.Documents.Any()))
+        {
+            <div class="mt-4">
+                <h6 class="fw-bold">📎 Supporting Documents:</h6>
+                <ul>
+                    @foreach (var claim in Model.Claims)
+                    {
+                        @foreach (var doc in claim.Documents.Where(d => d.IsActive))
+                        {
+                            <li>
+                                Claim CL-@claim.ClaimId.ToString("D6"): @doc.FileName
+                                (Uploaded: @doc.UploadDate.ToString("dd/MM/yyyy"))
+                            </li>
+                        }
+                    }
+                </ul>
+            </div>
+        }
+
+        <!-- Footer -->
+        <div class="text-center mt-5 pt-4" style="border-top: 1px solid #ddd;">
+            <p class="text-muted mb-0">
+                <small>
+                    This is a computer-generated invoice and does not require a signature.<br>
+                    Generated on @DateTime.Now.ToString("dd MMMM yyyy HH:mm")
+                </small>
+            </p>
+        </div>
+    </div>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
