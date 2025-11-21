@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace ProgPOE.Models
 {
-    // Represents a system user such as a Lecturer, Coordinator, or Manager
+    // Represents a system user such as a Lecturer, Coordinator, Manager, or HR
     public class User
     {
         // Primary key for the User table
@@ -30,7 +30,7 @@ namespace ProgPOE.Models
         [StringLength(50)]
         public string LastName { get; set; } = string.Empty;
 
-        // Defines the role of the user in the system (Lecturer, Coordinator, or Manager)
+        // Defines the role of the user in the system (Lecturer, Coordinator, Manager, or HR)
         [Required]
         public UserRole Role { get; set; }
 
@@ -50,6 +50,10 @@ namespace ProgPOE.Models
         // Computed property combining first and last names — not stored in the database
         [NotMapped]
         public string FullName => $"{FirstName} {LastName}";
+
+        // Navigation property to claims submitted by this user (for lecturers)
+        // Establishes a one-to-many relationship between User and Claim entities
+        public virtual ICollection<Claim> Claims { get; set; } = new List<Claim>();
     }
 
     // Enum representing different roles available in the system
@@ -57,7 +61,7 @@ namespace ProgPOE.Models
     {
         Lecturer,              // Basic user who submits claims
         ProgrammeCoordinator,  // Approves claims before manager review
-        AcademicManager,         // Final approver of claims
+        AcademicManager,       // Final approver of claims
         HR                     // Human Resources - manages lecturers and generates reports
     }
 }

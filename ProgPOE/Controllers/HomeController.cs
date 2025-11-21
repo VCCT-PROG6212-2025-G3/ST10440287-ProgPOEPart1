@@ -91,6 +91,13 @@ namespace ProgPOE.Controllers
             try
             {
                 int userId = GetCurrentUserId();
+                var userRole = GetCurrentUserRole();
+
+                // ADD THIS: Redirect HR users to HR Dashboard
+                if (userRole == UserRole.HR)
+                {
+                    return RedirectToAction("Dashboard", "HR");
+                }
 
                 // Get dashboard data from claim service
                 var dashboardData = await _claimService.GetDashboardDataAsync(userId);

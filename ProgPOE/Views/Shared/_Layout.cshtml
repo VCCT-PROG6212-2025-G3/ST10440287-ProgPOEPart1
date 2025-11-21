@@ -3,42 +3,16 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Contract Monthly Claim System</title>
+    <title>@ViewData["Title"] - ProgPOE</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <style>
-        .navbar-brand {
-            font-weight: bold;
-            font-size: 1.3rem;
-        }
-
-        .role-switcher {
-            background: #f8f9fa;
-            padding: 10px 15px;
-            border-radius: 5px;
-            margin-right: 15px;
-        }
-
-        .current-role-badge {
-            font-size: 0.9rem;
-            padding: 5px 12px;
-        }
-
-        .footer {
-            background-color: #f8f9fa;
-            padding: 20px 0;
-            margin-top: 50px;
-            border-top: 1px solid #dee2e6;
-        }
-    </style>
+    <link rel="stylesheet" href="~/ProgPOE.styles.css" asp-append-version="true" />
 </head>
 <body>
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    📋 CMCS
-                </a>
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">ProgPOE</a>
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
                         aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
@@ -46,65 +20,91 @@
                 <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
                     <ul class="navbar-nav flex-grow-1">
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">🏠 Home</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Dashboard">📊 Dashboard</a>
+                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Dashboard">Dashboard</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="SubmitClaim">📝 Submit Claim</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="MyClaims">📋 My Claims</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="ApproveClaims">✅ Review Claims</a>
-                        </li>
+
+                        @if (Context.Session.GetString("UserRole") == "Lecturer")
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="SubmitClaim">Submit Claim</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="MyClaims">My Claims</a>
+                            </li>
+                        }
+
+                        @if (Context.Session.GetString("UserRole") == "ProgrammeCoordinator" ||
+                        Context.Session.GetString("UserRole") == "AcademicManager")
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="ApproveClaims">Approve Claims</a>
+                            </li>
+                        }
+
+                        @if (Context.Session.GetString("UserRole") == "HR")
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="HR" asp-action="Dashboard">HR Dashboard</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="HR" asp-action="ManageLecturers">Manage Lecturers</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-dark" asp-area="" asp-controller="HR" asp-action="Reports">Reports</a>
+                            </li>
+                        }
                     </ul>
 
-                    <!-- Role Switcher -->
+                    @* User Role Display - Top Right *@
                     <div class="d-flex align-items-center">
-                        <div class="role-switcher">
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="roleSwitcher" data-bs-toggle="dropdown" aria-expanded="false">
-                                    👤 @(ViewBag.CurrentUser != null ? ViewBag.CurrentUser.UserName : "John Smith")
-                                    <span class="badge bg-primary current-role-badge">
-                                        @(ViewBag.CurrentUser != null ? ViewBag.CurrentUser.UserRole : "Lecturer")
-                                    </span>
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="roleSwitcher">
-                                    <li><h6 class="dropdown-header">Switch Role</h6></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li>
-                                        <a class="dropdown-item" href="@Url.Action("SwitchRole", "Home", new { userId = 1 })">
-                                            👨‍🏫 John Smith (Lecturer)
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="@Url.Action("SwitchRole", "Home", new { userId = 2 })">
-                                            👤 Jane Wilson (Programme Coordinator)
-                                        </a>
-                                    </li>
-                                    <li>
-                                        <a class="dropdown-item" href="@Url.Action("SwitchRole", "Home", new { userId = 3 })">
-                                            👔 Mike Johnson (Academic Manager)
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
+                        <span class="navbar-text me-3">
+                            <strong>@Context.Session.GetString("UserName")</strong>
+                            (@Context.Session.GetString("UserRole"))
+                        </span>
+                        <div class="dropdown">
+                            <button class="btn btn-outline-secondary dropdown-toggle" type="button" id="switchRoleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Switch Role
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="switchRoleDropdown">
+                                <li>
+                                    <form asp-action="SwitchRole" asp-controller="Home" method="get" class="dropdown-item-form">
+                                        <input type="hidden" name="userId" value="1" />
+                                        <button type="submit" class="dropdown-item">Lecturer (John Smith)</button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form asp-action="SwitchRole" asp-controller="Home" method="get" class="dropdown-item-form">
+                                        <input type="hidden" name="userId" value="2" />
+                                        <button type="submit" class="dropdown-item">Programme Coordinator (Jane Wilson)</button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form asp-action="SwitchRole" asp-controller="Home" method="get" class="dropdown-item-form">
+                                        <input type="hidden" name="userId" value="3" />
+                                        <button type="submit" class="dropdown-item">Academic Manager (Mike Johnson)</button>
+                                    </form>
+                                </li>
+                                <li>
+                                    <form asp-action="SwitchRole" asp-controller="Home" method="get" class="dropdown-item-form">
+                                        <input type="hidden" name="userId" value="4" />
+                                        <button type="submit" class="dropdown-item">HR (Sarah Adams)</button>
+                                    </form>
+                                </li>
+                            </ul>
                         </div>
                     </div>
                 </div>
             </div>
         </nav>
     </header>
-
     <div class="container">
-        <!-- Alert Messages -->
         @if (TempData["Success"] != null)
         {
             <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <strong>✅ Success!</strong> @TempData["Success"]
+                <strong>Success!</strong> @TempData["Success"]
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
@@ -112,7 +112,7 @@
         @if (TempData["Error"] != null)
         {
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <strong>❌ Error!</strong> @TempData["Error"]
+                <strong>Error!</strong> @TempData["Error"]
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
@@ -120,7 +120,7 @@
         @if (TempData["Warning"] != null)
         {
             <div class="alert alert-warning alert-dismissible fade show" role="alert">
-                <strong>⚠️ Warning!</strong> @TempData["Warning"]
+                <strong>Warning!</strong> @TempData["Warning"]
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
@@ -128,7 +128,7 @@
         @if (TempData["Info"] != null)
         {
             <div class="alert alert-info alert-dismissible fade show" role="alert">
-                <strong>ℹ️ Info!</strong> @TempData["Info"]
+                <strong>Info:</strong> @Html.Raw(TempData["Info"])
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         }
@@ -138,23 +138,11 @@
         </main>
     </div>
 
-    <footer class="footer">
+    <footer class="border-top footer text-muted">
         <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="text-muted mb-0">
-                        &copy; 2024 - Contract Monthly Claim System
-                    </p>
-                </div>
-                <div class="col-md-6 text-end">
-                    <p class="text-muted mb-0">
-                        Current Role: <strong>@(ViewBag.CurrentUser != null ? ViewBag.CurrentUser.UserRole : "Lecturer")</strong>
-                    </p>
-                </div>
-            </div>
+            &copy; 2024 - ProgPOE - <a asp-area="" asp-controller="Home" asp-action="Index">Privacy</a>
         </div>
     </footer>
-
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
