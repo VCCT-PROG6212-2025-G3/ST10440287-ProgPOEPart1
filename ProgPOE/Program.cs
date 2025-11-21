@@ -205,3 +205,10 @@ namespace ProgPOE
 // - Session Management: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/app-state?view=aspnetcore-6.0
 // - Environment Management: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/environments?view=aspnetcore-6.0
 // - ChatGPT: https://chatgpt.com/share/68f8c478-59c0-8001-8fba-a9574663b979
+// Part 3 
+// - Error Handling: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/error-handling/?view=aspnetcore-6.0
+// - Routing: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/routing/?view=aspnetcore-6.0
+// - ASP.NET Core MVC Best Practices: https://learn.microsoft.com/en-us/aspnet/core/mvc/overview?view=aspnetcore-6.0
+// - Automation - https://www.browserstack.com/guide/c-sharp-testing-frameworks
+// - Database - https://www.geeksforgeeks.org/c-sharp/basic-database-operations-using-c-sharp/
+// - ASP.NET Core Application Initialization: https://learn.microsoft.com/en-us/aspnet/core/fundamentals/startup?view=aspnetcore-6.0
