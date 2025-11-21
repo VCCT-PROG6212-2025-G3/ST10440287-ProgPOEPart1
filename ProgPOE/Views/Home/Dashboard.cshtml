@@ -4,10 +4,46 @@
     Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="row">
-    <div class="col-md-12">
+<style>
+    .card-stat {
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+
+        .card-stat:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+
+    @@keyframes fadeIn {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+
+    .card {
+        animation: fadeIn 0.5s ease;
+    }
+</style>
+
+<div class="row mb-3">
+    <div class="col-md-9">
         <h2>📊 @Model.UserRole Dashboard</h2>
         <p class="text-muted">Welcome back, @Model.UserName! Here's an overview of your claims activity.</p>
+    </div>
+    <div class="col-md-3 text-end">
+        <button id="refreshDashboard" class="btn btn-primary">
+            <i class="fas fa-sync-alt"></i> Refresh Data
+        </button>
     </div>
 </div>
 
@@ -17,7 +53,7 @@
         <div class="card card-stat card-total">
             <div class="card-body">
                 <h5 class="card-title">📊 Total Claims</h5>
-                <h3 class="card-text text-primary">@Model.TotalClaims</h3>
+                <h3 class="card-text text-primary" id="totalClaimsValue">@Model.TotalClaims</h3>
                 <small class="text-muted">All time</small>
             </div>
         </div>
@@ -26,7 +62,7 @@
         <div class="card card-stat card-pending">
             <div class="card-body">
                 <h5 class="card-title">⏳ Pending</h5>
-                <h3 class="card-text text-warning">@Model.PendingClaims</h3>
+                <h3 class="card-text text-warning" id="pendingClaimsValue">@Model.PendingClaims</h3>
                 <small class="text-muted">Awaiting approval</small>
             </div>
         </div>
@@ -35,7 +71,7 @@
         <div class="card card-stat card-approved">
             <div class="card-body">
                 <h5 class="card-title">✅ Approved</h5>
-                <h3 class="card-text text-success">@Model.ApprovedClaims</h3>
+                <h3 class="card-text text-success" id="approvedClaimsValue">@Model.ApprovedClaims</h3>
                 <small class="text-muted">Successfully processed</small>
             </div>
         </div>
@@ -44,8 +80,104 @@
         <div class="card card-stat card-rejected">
             <div class="card-body">
                 <h5 class="card-title">💰 Total Earnings</h5>
-                <h3 class="card-text text-success">@Model.FormattedEarnings</h3>
+                <h3 class="card-text text-success" id="totalEarningsValue">@Model.FormattedEarnings</h3>
                 <small class="text-muted">Approved claims</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mt-4">
+    <!-- Pie Chart -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> Claim Status Distribution</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="claimStatusChart" height="200"></canvas>
+                <div class="mt-3 text-center small">
+                    <span class="mr-3">
+                        <i class="fas fa-circle text-success"></i> Approved (@Model.ApprovedClaims)
+                    </span>
+                    <span class="mr-3">
+                        <i class="fas fa-circle text-warning"></i> Pending (@Model.PendingClaims)
+                    </span>
+                    <span>
+                        <i class="fas fa-circle text-danger"></i> Rejected (@Model.RejectedClaims)
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Progress Overview -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tasks"></i> Claims Progress Overview</h5>
+            </div>
+            <div class="card-body">
+                @{
+                    var approvalRate = Model.TotalClaims > 0 ? (Model.ApprovedClaims * 100.0 / Model.TotalClaims) : 0;
+                    var pendingRate = Model.TotalClaims > 0 ? (Model.PendingClaims * 100.0 / Model.TotalClaims) : 0;
+                    var rejectedRate = Model.TotalClaims > 0 ? (Model.RejectedClaims * 100.0 / Model.TotalClaims) : 0;
+                }
+
+                <!-- Approved Progress -->
+                <h6 class="small font-weight-bold">
+                    Approved Claims
+                    <span class="float-end">@approvalRate.ToString("F1")%</span>
+                </h6>
+                <div class="progress mb-4" style="height: 25px;">
+                    <div class="progress-bar bg-success" role="progressbar"
+                         style="width: @approvalRate.ToString("F1")%"
+                         aria-valuenow="@approvalRate" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+
+                <!-- Pending Progress -->
+                <h6 class="small font-weight-bold">
+                    Pending Review
+                    <span class="float-end">@pendingRate.ToString("F1")%</span>
+                </h6>
+                <div class="progress mb-4" style="height: 25px;">
+                    <div class="progress-bar bg-warning" role="progressbar"
+                         style="width: @pendingRate.ToString("F1")%"
+                         aria-valuenow="@pendingRate" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+
+                <!-- Rejected Progress -->
+                <h6 class="small font-weight-bold">
+                    Rejected Claims
+                    <span class="float-end">@rejectedRate.ToString("F1")%</span>
+                </h6>
+                <div class="progress mb-4" style="height: 25px;">
+                    <div class="progress-bar bg-danger" role="progressbar"
+                         style="width: @rejectedRate.ToString("F1")%"
+                         aria-valuenow="@rejectedRate" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+
+                <!-- Summary Stats -->
+                <div class="mt-4 p-3 bg-light rounded">
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="text-success font-weight-bold h4">@Model.ApprovedClaims</div>
+                            <div class="small">Approved</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-warning font-weight-bold h4">@Model.PendingClaims</div>
+                            <div class="small">Pending</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="text-danger font-weight-bold h4">@Model.RejectedClaims</div>
+                            <div class="small">Rejected</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -227,7 +359,97 @@
 </div>
 
 @section Scripts {
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+
     <script>
+        // ============================================
+        // ANIMATED CHART RENDERING
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            const ctx = document.getElementById('claimStatusChart').getContext('2d');
+            const claimStatusChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Approved', 'Pending', 'Rejected'],
+                    datasets: [{
+                        data: [@Model.ApprovedClaims, @Model.PendingClaims, @Model.RejectedClaims],
+                        backgroundColor: [
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(220, 53, 69, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(255, 193, 7, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    let value = context.parsed || 0;
+                                    let total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Animate number counters
+            animateValue('totalClaimsValue', 0, @Model.TotalClaims, 1000);
+            animateValue('pendingClaimsValue', 0, @Model.PendingClaims, 1000);
+            animateValue('approvedClaimsValue', 0, @Model.ApprovedClaims, 1000);
+        });
+
+        // ============================================
+        // ANIMATED COUNTER
+        // ============================================
+        function animateValue(id, start, end, duration) {
+            const obj = document.getElementById(id);
+            if (!obj) return;
+
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = Math.floor(progress * (end - start) + start);
+                obj.textContent = current;
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // ============================================
+        // REFRESH BUTTON
+        // ============================================
+        document.getElementById('refreshDashboard').addEventListener('click', function() {
+            const btn = this;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            btn.disabled = true;
+            setTimeout(function() {
+                location.reload();
+            }, 1000);
+        });
+
+        // ============================================
+        // EXISTING FUNCTIONS
+        // ============================================
         function showStatistics() {
             alert('📊 System Statistics\n\n' +
                 'Total Claims: @Model.TotalClaims\n' +
