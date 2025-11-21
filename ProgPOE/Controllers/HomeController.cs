@@ -11,6 +11,8 @@ namespace ProgPOE.Controllers
         private readonly ILogger<HomeController> _logger;
         private readonly IClaimService _claimService;
         private readonly IFileService _fileService;
+        private readonly IClaimValidationService _validationService;
+        private readonly IApprovalWorkflowService _workflowService;
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _environment;
 
@@ -19,12 +21,16 @@ namespace ProgPOE.Controllers
             ILogger<HomeController> logger,
             IClaimService claimService,
             IFileService fileService,
+            IClaimValidationService validationService,
+            IApprovalWorkflowService workflowService,
             ApplicationDbContext context,
             IWebHostEnvironment environment)
         {
             _logger = logger;
             _claimService = claimService;
             _fileService = fileService;
+            _validationService = validationService;
+            _workflowService = workflowService;
             _context = context;
             _environment = environment;
         }
@@ -145,9 +151,25 @@ namespace ProgPOE.Controllers
                     LecturerNotes = model.Notes
                 };
 
+                // Run automated validation BEFORE saving
+                var validation = _validationService.AutoVerifyClaim(claim);
+
+                if (!validation.IsValid)
+                {
+                    TempData["Error"] = "Claim validation failed: " + string.Join(", ", validation.Errors);
+                    ViewBag.CurrentUser = GetCurrentUserInfo();
+                    return View(model);
+                }
+
                 // Save claim to database
                 _context.Claims.Add(claim);
                 await _context.SaveChangesAsync();
+
+                // Show validation warnings if any
+                if (validation.Warnings.Any())
+                {
+                    TempData["Warning"] = "Claim submitted with warnings: " + string.Join(", ", validation.Warnings);
+                }
 
                 // Handle optional file uploads
                 if (model.Documents != null && model.Documents.Any())
@@ -166,15 +188,15 @@ namespace ProgPOE.Controllers
                     }
                     else
                     {
-                        TempData["Success"] = $"Claim submitted successfully with {uploadResult.Documents.Count} document(s)!";
+                        TempData["Success"] = $"Claim submitted successfully with {uploadResult.Documents.Count} document(s)! Risk Score: {validation.RiskScore}/100";
                     }
                 }
                 else
                 {
-                    TempData["Success"] = "Claim submitted successfully!";
+                    TempData["Success"] = $"Claim submitted successfully! Risk Score: {validation.RiskScore}/100";
                 }
 
-                _logger.LogInformation($"Claim {claim.ClaimId} submitted by user {userId}");
+                _logger.LogInformation($"Claim {claim.ClaimId} submitted by user {userId} with risk score {validation.RiskScore}");
                 return RedirectToAction("MyClaims");
             }
             catch (Exception ex)
@@ -232,9 +254,12 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("MyClaims");
                 }
 
+                // Run validation for display
+                var validation = _validationService.ValidateClaim(claim);
+                ViewBag.Validation = validation;
                 ViewBag.CurrentUser = GetCurrentUserInfo();
 
-                _logger.LogInformation($"Viewing Claim {id}: Status = {claim.Status}");
+                _logger.LogInformation($"Viewing Claim {id}: Status = {claim.Status}, RiskScore = {validation.RiskScore}");
 
                 return View(claim);
             }
@@ -253,6 +278,7 @@ namespace ProgPOE.Controllers
             try
             {
                 var userRole = GetCurrentUserRole();
+                var userId = GetCurrentUserId();
 
                 // Lecturers cannot approve claims
                 if (userRole == UserRole.Lecturer)
@@ -261,19 +287,18 @@ namespace ProgPOE.Controllers
                     return RedirectToAction("Dashboard");
                 }
 
-                // Load pending claims
-                var pendingClaims = await _claimService.GetPendingClaimsAsync();
+                // Get claims for this approver using workflow service
+                var pendingClaims = await _workflowService.GetClaimsForApproverAsync(userId, userRole);
 
-                // Filter claims based on role
-                if (userRole == UserRole.ProgrammeCoordinator)
+                // Run validation on each claim for display
+                var claimsWithValidation = new List<(Claim Claim, ValidationResult Validation)>();
+                foreach (var claim in pendingClaims)
                 {
-                    pendingClaims = pendingClaims.Where(c => c.Status == ClaimStatus.Pending).ToList();
-                }
-                else if (userRole == UserRole.AcademicManager)
-                {
-                    pendingClaims = pendingClaims.Where(c => c.Status == ClaimStatus.PendingManager).ToList();
+                    var validation = _validationService.ValidateClaim(claim);
+                    claimsWithValidation.Add((claim, validation));
                 }
 
+                ViewBag.ClaimsWithValidation = claimsWithValidation;
                 ViewBag.CurrentUser = GetCurrentUserInfo();
 
                 _logger.LogInformation($"Approve Claims loaded for {userRole}: {pendingClaims.Count} claims to review");
@@ -288,7 +313,7 @@ namespace ProgPOE.Controllers
             }
         }
 
-        // POST: Home/ProcessApproval
+        // POST: Home/ProcessApproval - NOW USES WORKFLOW SERVICE
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> ProcessApproval(int claimId, ApprovalAction action, string comments)
@@ -307,17 +332,24 @@ namespace ProgPOE.Controllers
 
                 _logger.LogInformation($"Processing approval: ClaimId={claimId}, Action={action}, Approver={approverId}");
 
-                // Process approval via service
-                var result = await _claimService.ProcessApprovalAsync(claimId, action, comments, approverId);
+                // Process through automated workflow
+                var decision = await _workflowService.ProcessWorkflowAsync(claimId, action, approverId, comments);
 
-                if (result)
+                if (decision.Success)
                 {
-                    TempData["Success"] = $"Claim {action.ToString().ToLower()}ed successfully!";
-                    _logger.LogInformation($"Claim {claimId} {action.ToString().ToLower()}ed by {approverId}");
+                    TempData["Success"] = decision.Message;
+
+                    // Show notifications
+                    if (decision.Notifications.Any())
+                    {
+                        TempData["Info"] = string.Join("<br>", decision.Notifications);
+                    }
+
+                    _logger.LogInformation($"Workflow success: Claim {claimId} -> {decision.NewStatus}");
                 }
                 else
                 {
-                    TempData["Error"] = "Error processing approval.";
+                    TempData["Error"] = decision.Message;
                 }
 
                 return RedirectToAction("ApproveClaims");

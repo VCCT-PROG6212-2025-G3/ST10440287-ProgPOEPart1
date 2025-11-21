@@ -23,6 +23,9 @@ namespace ProgPOE
             builder.Services.AddScoped<IClaimService, ClaimService>();
             builder.Services.AddScoped<IFileService, FileService>();
 
+            builder.Services.AddScoped<IClaimValidationService, ClaimValidationService>();
+            builder.Services.AddScoped<IApprovalWorkflowService, ApprovalWorkflowService>();
+
             // Configure session options
             builder.Services.AddSession(options =>
             {

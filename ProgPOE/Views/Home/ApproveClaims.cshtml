@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Approve Claims";
     Layout = "~/Views/Shared/_Layout.cshtml";
+    var claimsWithValidation = ViewBag.ClaimsWithValidation as List<(ProgPOE.Models.Claim Claim, ProgPOE.Services.ValidationResult Validation)>;
 }
 
 <style>
@@ -27,6 +28,19 @@
         .claim-review-card.selected {
             border-left-color: #007bff;
             background-color: #f8f9fa;
+        }
+
+        /* Risk-based border colors */
+        .claim-review-card.risk-low {
+            border-left-color: #28a745;
+        }
+
+        .claim-review-card.risk-medium {
+            border-left-color: #ffc107;
+        }
+
+        .claim-review-card.risk-high {
+            border-left-color: #dc3545;
         }
 
     .stat-card {
@@ -75,12 +89,13 @@
     }
 
     @@keyframes pulse {
-        0%, 100%{
-        opacity: 1;
-    }
-    50% {
-        opacity: 0.7;
-    }
+        0%, 100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
     }
 
     .document-list {
@@ -93,6 +108,52 @@
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 15px;
+    }
+
+    /* Validation styles */
+    .validation-section {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+
+    .risk-badge {
+        font-size: 0.9rem;
+        padding: 0.35rem 0.65rem;
+        font-weight: bold;
+    }
+
+    .auto-recommendation {
+        border: 2px solid;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 10px 0;
+        font-weight: bold;
+    }
+
+        .auto-recommendation.approve {
+            border-color: #28a745;
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .auto-recommendation.caution {
+            border-color: #ffc107;
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .auto-recommendation.review {
+            border-color: #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+    .validation-list {
+        max-height: 150px;
+        overflow-y: auto;
+        font-size: 0.875rem;
     }
 </style>
 
@@ -120,8 +181,11 @@
     </div>
     <div class="col-md-3">
         <div class="stat-card bg-info text-center">
-            <h2>@Model.Count(c => c.TotalAmount > 50000)</h2>
-            <p class="mb-0">💰 High Value (>R50k)</p>
+            @{
+                var highRiskCount = claimsWithValidation?.Count(cv => cv.Validation.RiskScore >= 50) ?? 0;
+            }
+            <h2>@highRiskCount</h2>
+            <p class="mb-0">⚠️ High Risk Claims</p>
         </div>
     </div>
     <div class="col-md-3">
@@ -144,6 +208,9 @@
                 <select class="form-control" id="priorityFilter" onchange="filterClaims()">
                     <option value="all">All Claims</option>
                     <option value="urgent">Urgent (>7 days)</option>
+                    <option value="high-risk">High Risk (Score ≥50)</option>
+                    <option value="medium-risk">Medium Risk (Score 30-49)</option>
+                    <option value="low-risk">Low Risk (Score <30)</option>
                     <option value="high-value">High Value (>R50k)</option>
                     <option value="recent">Recent (Last 3 days)</option>
                 </select>
@@ -151,6 +218,8 @@
             <div class="col-md-3">
                 <label class="form-label fw-bold">Sort by:</label>
                 <select class="form-control" id="sortOrder" onchange="sortClaims()">
+                    <option value="risk-desc">Risk Score (High to Low)</option>
+                    <option value="risk-asc">Risk Score (Low to High)</option>
                     <option value="date-asc">Date (Oldest First)</option>
                     <option value="date-desc">Date (Newest First)</option>
                     <option value="amount-desc">Amount (High to Low)</option>
@@ -194,18 +263,25 @@
                 else
                 {
                     <div id="claimsList">
-                        @foreach (var claim in Model.OrderBy(c => c.SubmissionDate))
+                        @foreach (var item in claimsWithValidation.OrderBy(cv => cv.Claim.SubmissionDate))
                         {
+                            var claim = item.Claim;
+                            var validation = item.Validation;
                             var daysWaiting = (DateTime.Now - claim.SubmissionDate).Days;
                             var isUrgent = daysWaiting > 7;
                             var isHighValue = claim.TotalAmount > 50000;
 
-                            <div class="card claim-review-card"
+                            // Determine risk class
+                            var riskClass = validation.RiskScore >= 50 ? "risk-high" :
+                            validation.RiskScore >= 30 ? "risk-medium" : "risk-low";
+
+                            <div class="card claim-review-card @riskClass"
                                  data-claim-id="@claim.ClaimId"
                                  data-amount="@claim.TotalAmount"
                                  data-date="@claim.SubmissionDate.Ticks"
                                  data-lecturer="@claim.Lecturer?.FullName"
-                                 data-days="@daysWaiting">
+                                 data-days="@daysWaiting"
+                                 data-risk="@validation.RiskScore">
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-md-1">
@@ -225,6 +301,24 @@
                                                         {
                                                             <span class="badge bg-warning text-dark ms-2">💰 High Value</span>
                                                         }
+
+                                                        @* Risk Badge *@
+                                                        @if (validation.RiskScore == 0)
+                                                        {
+                                                            <span class="badge bg-success risk-badge ms-2">✅ Ready to Approve</span>
+                                                        }
+                                                        else if (validation.RiskScore < 30)
+                                                        {
+                                                            <span class="badge bg-info risk-badge ms-2">📋 Low Risk (@validation.RiskScore)</span>
+                                                        }
+                                                        else if (validation.RiskScore < 50)
+                                                        {
+                                                            <span class="badge bg-warning risk-badge ms-2">⚠️ Medium Risk (@validation.RiskScore)</span>
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="badge bg-danger risk-badge ms-2">🚨 High Risk (@validation.RiskScore)</span>
+                                                        }
                                                     </h5>
                                                     <p class="text-muted mb-0">
                                                         <small>
@@ -236,6 +330,48 @@
                                                 <span class="badge badge-large bg-primary">
                                                     CL-@claim.ClaimId.ToString("D6")
                                                 </span>
+                                            </div>
+
+                                            @* Automated Verification Section *@
+                                            <div class="validation-section">
+                                                <h6 class="fw-bold mb-2">🤖 Automated Verification Results</h6>
+
+                                                <div class="auto-recommendation @(validation.RecommendedAction == "Auto-Approve" ? "approve" : validation.RecommendedAction.Contains("Caution") || validation.RecommendedAction.Contains("Notes") ? "caution" : "review")">
+                                                    <strong>System Recommendation:</strong> @validation.RecommendedAction
+                                                </div>
+
+                                                @if (validation.Errors.Any())
+                                                {
+                                                    <div class="alert alert-danger mb-2 p-2">
+                                                        <strong>❌ Errors Found:</strong>
+                                                        <ul class="mb-0 validation-list">
+                                                            @foreach (var error in validation.Errors)
+                                                            {
+                                                                <li>@error</li>
+                                                            }
+                                                        </ul>
+                                                    </div>
+                                                }
+
+                                                @if (validation.Warnings.Any())
+                                                {
+                                                    <div class="alert alert-warning mb-2 p-2">
+                                                        <strong>⚠️ Warnings:</strong>
+                                                        <ul class="mb-0 validation-list">
+                                                            @foreach (var warning in validation.Warnings)
+                                                            {
+                                                                <li>@warning</li>
+                                                            }
+                                                        </ul>
+                                                    </div>
+                                                }
+
+                                                @if (!validation.Errors.Any() && !validation.Warnings.Any())
+                                                {
+                                                    <div class="alert alert-success mb-2 p-2">
+                                                        ✅ All automated checks passed successfully!
+                                                    </div>
+                                                }
                                             </div>
 
                                             <div class="row mb-2">
@@ -285,7 +421,7 @@
 
                                             <div class="mt-3">
                                                 <button class="btn btn-primary btn-sm me-2"
-                                                        onclick="reviewClaim(@claim.ClaimId, '@claim.Lecturer?.FullName', '@claim.MonthYear', @claim.HoursWorked, @claim.HourlyRate, @claim.TotalAmount, '@claim.LecturerNotes', @claim.Documents.Count, '@claim.SubmissionDate.ToString("dd MMM yyyy")', @daysWaiting)">
+                                                        onclick="reviewClaim(@claim.ClaimId, '@claim.Lecturer?.FullName', '@claim.MonthYear', @claim.HoursWorked, @claim.HourlyRate, @claim.TotalAmount, '@claim.LecturerNotes?.Replace("'", "\\'").Replace("\n", " ")', @claim.Documents.Count, '@claim.SubmissionDate.ToString("dd MMM yyyy")', @daysWaiting, @validation.RiskScore, '@validation.RecommendedAction', '@Html.Raw(Json.Serialize(validation.Warnings))', '@Html.Raw(Json.Serialize(validation.Errors))')">
                                                     🔍 Review Claim
                                                 </button>
                                                 <button class="btn btn-success btn-sm me-2"
@@ -335,6 +471,9 @@
             <div class="card-body">
                 <div id="claimDetails"></div>
 
+                @* Validation summary in review panel *@
+                <div id="validationSummary" class="mb-3"></div>
+
                 <hr>
 
                 <h6 class="fw-bold">💬 Review Comments:</h6>
@@ -364,42 +503,52 @@
                 <h6 class="mb-0">📋 Approval Guidelines</h6>
             </div>
             <div class="card-body">
+                <div class="alert alert-info mb-3">
+                    <h6 class="text-primary">🤖 Automated Verification System:</h6>
+                    <ul class="small mb-0">
+                        <li><strong>Risk Score:</strong> 0-100 (lower is better)</li>
+                        <li><strong>Policy Checks:</strong> Hours, rates, duplicates</li>
+                        <li><strong>Document Verification:</strong> Minimum requirements</li>
+                        <li><strong>Recommendations:</strong> Based on validation results</li>
+                    </ul>
+                </div>
+
                 <div class="guideline-box">
                     <h6 class="text-success">✅ Approve if:</h6>
                     <ul class="small mb-0">
-                        <li>Hours are reasonable and documented</li>
-                        <li>Supporting documents are complete</li>
-                        <li>Hourly rate matches contract</li>
-                        <li>No discrepancies in information</li>
-                        <li>All required fields are filled</li>
+                        <li>Risk Score < 30 (Low Risk)</li>
+                        <li>No validation errors</li>
+                        <li>Supporting documents complete</li>
+                        <li>Rate matches HR records</li>
+                        <li>No duplicate submissions</li>
                     </ul>
                 </div>
 
                 <div class="guideline-box">
                     <h6 class="text-danger">❌ Reject if:</h6>
                     <ul class="small mb-0">
+                        <li>Validation errors present</li>
                         <li>Missing required documentation</li>
-                        <li>Hours exceed reasonable limits</li>
-                        <li>Inconsistent information</li>
-                        <li>Duplicate submissions</li>
-                        <li>Incorrect rate applied</li>
+                        <li>Duplicate claim detected</li>
+                        <li>Hours exceed 744/month</li>
+                        <li>Rate doesn't match HR records</li>
                     </ul>
                 </div>
 
                 <div class="guideline-box">
-                    <h6 class="text-warning">↩️ Return if:</h6>
+                    <h6 class="text-warning">⚠️ Review Carefully if:</h6>
                     <ul class="small mb-0">
-                        <li>Minor corrections needed</li>
-                        <li>Additional documents required</li>
-                        <li>Clarification needed</li>
-                        <li>Small errors that can be fixed</li>
+                        <li>Risk Score ≥ 50 (High Risk)</li>
+                        <li>Multiple warnings present</li>
+                        <li>High value claim (>R100k)</li>
+                        <li>Excessive hours (>200/month)</li>
+                        <li>Rate differs from default</li>
                     </ul>
                 </div>
 
                 <div class="alert alert-info mb-0 mt-3">
                     <small>
-                        <strong>💡 Tip:</strong> Review urgent claims first (marked with 🚨)
-                        and high-value claims (>R50,000) carefully.
+                        <strong>💡 Tip:</strong> Review urgent claims (>7 days waiting) and high-risk claims (score ≥50) first.
                     </small>
                 </div>
             </div>
@@ -410,10 +559,28 @@
 @section Scripts {
     <script>
         let currentClaimId = null;
+        let currentValidation = null;
 
-        // Review a specific claim
-        function reviewClaim(claimId, lecturerName, period, hours, rate, total, notes, docCount, submittedDate, daysWaiting) {
+        // Review a specific claim with validation data
+        function reviewClaim(claimId, lecturerName, period, hours, rate, total, notes, docCount, submittedDate, daysWaiting, riskScore, recommendation, warningsJson, errorsJson) {
             currentClaimId = claimId;
+
+            // Parse validation data
+            let warnings = [];
+            let errors = [];
+            try {
+                warnings = JSON.parse(warningsJson.replace(/&quot;/g, '"'));
+                errors = JSON.parse(errorsJson.replace(/&quot;/g, '"'));
+            } catch (e) {
+                console.error('Error parsing validation data:', e);
+            }
+
+            currentValidation = {
+                riskScore: riskScore,
+                recommendation: recommendation,
+                warnings: warnings,
+                errors: errors
+            };
 
             // Highlight selected claim
             document.querySelectorAll('.claim-review-card').forEach(card => {
@@ -440,9 +607,59 @@
                 ${notes ? `<div class="alert alert-info"><strong>Notes:</strong><br>${notes}</div>` : ''}
             `;
 
+            // Populate validation summary
+            const riskBadge = riskScore >= 50 ? 'danger' : riskScore >= 30 ? 'warning' : 'success';
+            const riskText = riskScore >= 50 ? 'High Risk' : riskScore >= 30 ? 'Medium Risk' : 'Low Risk';
+
+            let validationHtml = `
+                <div class="alert alert-${riskBadge}">
+                    <strong>🤖 Risk Score:</strong> ${riskScore}/100 (${riskText})
+                </div>
+                <div class="alert alert-info">
+                    <strong>📋 Recommendation:</strong> ${recommendation}
+                </div>
+            `;
+
+            if (errors.length > 0) {
+                validationHtml += `
+                    <div class="alert alert-danger">
+                        <strong>❌ Errors:</strong>
+                        <ul class="mb-0 small">
+                            ${errors.map(e => `<li>${e}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (warnings.length > 0) {
+                validationHtml += `
+                    <div class="alert alert-warning">
+                        <strong>⚠️ Warnings:</strong>
+                        <ul class="mb-0 small">
+                            ${warnings.map(w => `<li>${w}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            }
+
+            if (errors.length === 0 && warnings.length === 0) {
+                validationHtml += `
+                    <div class="alert alert-success">
+                        ✅ All validation checks passed!
+                    </div>
+                `;
+            }
+
             document.getElementById('claimDetails').innerHTML = detailsHtml;
+            document.getElementById('validationSummary').innerHTML = validationHtml;
             document.getElementById('reviewPanel').style.display = 'block';
             document.getElementById('reviewComments').value = '';
+
+            // Pre-fill comments with verification insights
+            if (warnings.length > 0 || errors.length > 0) {
+                const autoComments = `System Verification Notes:\n${[...errors, ...warnings].join('\n')}`;
+                document.getElementById('reviewComments').placeholder = autoComments;
+            }
 
             // Scroll to review panel on mobile
             if (window.innerWidth < 992) {
@@ -454,9 +671,16 @@
         function approveClaim() {
             if (!currentClaimId) return;
 
-            const comments = document.getElementById('reviewComments').value;
+            let comments = document.getElementById('reviewComments').value;
 
-            if (confirm(`✅ Approve this claim?\n\nClaim ID: CL-${currentClaimId.toString().padStart(6, '0')}\n\nThis will forward the claim for final processing.`)) {
+            // Auto-append validation info
+            if (currentValidation && (currentValidation.warnings.length > 0 || currentValidation.errors.length > 0)) {
+                const validationNotes = `\n\nAutomated Verification:\nRisk Score: ${currentValidation.riskScore}/100\n` +
+                                      [...currentValidation.warnings, ...currentValidation.errors].join('\n');
+                comments = comments ? comments + validationNotes : validationNotes.substring(2);
+            }
+
+            if (confirm(`✅ Approve this claim?\n\nClaim ID: CL-${currentClaimId.toString().padStart(6, '0')}\nRisk Score: ${currentValidation?.riskScore || 0}/100\n\nThis will forward the claim for final processing.`)) {
                 submitApproval(currentClaimId, 'Approve', comments);
             }
         }
@@ -523,7 +747,7 @@
         // Quick approve
         function quickApprove(claimId, lecturerName) {
             if (confirm(`✅ Quick Approve\n\nApprove claim for ${lecturerName}?\n\nClaim ID: CL-${claimId.toString().padStart(6, '0')}`)) {
-                submitApproval(claimId, 'Approve', 'Quick approval - all requirements met');
+                submitApproval(claimId, 'Approve', 'Quick approval - automated verification passed');
             }
         }
 
@@ -545,6 +769,7 @@
                 card.classList.remove('selected');
             });
             currentClaimId = null;
+            currentValidation = null;
         }
 
         // Checkbox management
@@ -579,10 +804,10 @@
             }
 
             if (confirm(`✅ Bulk Approve\n\nApprove ${selected.length} claim(s)?\n\nAll selected claims will be forwarded for processing.`)) {
-                const comments = 'Bulk approval - all requirements met';
+                const comments = 'Bulk approval - automated verification reviewed';
                 selected.forEach(cb => {
                     const claimId = cb.getAttribute('data-claim-id');
-                    submitApproval(claimId, 'Approve', comments);
+                    setTimeout(() => submitApproval(claimId, 'Approve', comments), 100);
                 });
             }
         }
@@ -600,7 +825,7 @@
             if (reason && reason.trim()) {
                 selected.forEach(cb => {
                     const claimId = cb.getAttribute('data-claim-id');
-                    submitApproval(claimId, 'Reject', reason);
+                    setTimeout(() => submitApproval(claimId, 'Reject', reason), 100);
                 });
             }
         }
@@ -613,11 +838,21 @@
             claims.forEach(claim => {
                 const days = parseInt(claim.getAttribute('data-days'));
                 const amount = parseFloat(claim.getAttribute('data-amount'));
+                const risk = parseInt(claim.getAttribute('data-risk'));
                 let show = true;
 
                 switch(filter) {
                     case 'urgent':
                         show = days > 7;
+                        break;
+                    case 'high-risk':
+                        show = risk >= 50;
+                        break;
+                    case 'medium-risk':
+                        show = risk >= 30 && risk < 50;
+                        break;
+                    case 'low-risk':
+                        show = risk < 30;
                         break;
                     case 'high-value':
                         show = amount > 50000;
@@ -639,6 +874,10 @@
 
             claims.sort((a, b) => {
                 switch(sortOrder) {
+                    case 'risk-desc':
+                        return parseInt(b.getAttribute('data-risk')) - parseInt(a.getAttribute('data-risk'));
+                    case 'risk-asc':
+                        return parseInt(a.getAttribute('data-risk')) - parseInt(b.getAttribute('data-risk'));
                     case 'date-asc':
                         return parseInt(a.getAttribute('data-date')) - parseInt(b.getAttribute('data-date'));
                     case 'date-desc':
